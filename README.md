@@ -6,6 +6,8 @@ Instead of describing a file by location or passing screenshots through chat, a 
 
 > Built for the [OpenAI WebMCP Challenge](https://webmcp.devpost.com/) during the August 25–September 3, 2026 submission period.
 
+**Live app:** [webmcp-shared-canvas.vercel.app](https://webmcp-shared-canvas.vercel.app)
+
 ## Why WebMCP
 
 Cross-functional project feedback is often fragmented across chat messages, screenshots, links, and file versions. A browser agent can see a page, but visual browser control alone does not provide a reliable shared vocabulary or structured access to the work.
@@ -107,7 +109,7 @@ docs/                    Submission copy and challenge checklist
 - [x] Public open-source repository
 - [x] Detectable open-source license
 - [x] Local setup and judge testing instructions
-- [ ] Public live deployment URL
+- [x] Public live deployment URL
 - [ ] Public YouTube demo with audio, under three minutes
 - [ ] Final Devpost submission
 

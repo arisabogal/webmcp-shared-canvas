@@ -4,7 +4,7 @@ This document maps WebMCP Shared Canvas to the published WebMCP Challenge submis
 
 ## Required links
 
-- Live project: **Pending deployment**
+- Live project: https://webmcp-shared-canvas.vercel.app
 - Public repository: https://github.com/arisabogal/webmcp-shared-canvas
 - Public YouTube demo: **Pending recording and upload**
 
@@ -65,7 +65,8 @@ Do not use copyrighted music or third-party footage without permission.
 - [x] MIT open-source license at repository root
 - [x] Installation and testing instructions
 - [x] English project description covering WebMCP fit, UX, collaboration, and implementation
-- [ ] Working public URL tested in ChatGPT's in-app browser
+- [x] Working public URL deployed on Vercel
+- [ ] Public URL tested end-to-end in ChatGPT's in-app browser
 - [ ] Public YouTube demo shorter than three minutes, with audio
 - [ ] Live URL and YouTube URL inserted above and in Devpost
 - [ ] Devpost project saved and submitted before September 3, 2026 at 1:00 PM PDT
