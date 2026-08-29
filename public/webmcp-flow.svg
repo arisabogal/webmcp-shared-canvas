@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="768" viewBox="0 0 1200 768" role="img" aria-labelledby="title description">
+  <title id="title">WebMCP selection to action flow</title>
+  <description id="description">A human selects canvas work, receives a keyword, an agent resolves it through WebMCP, and both share the resulting action.</description>
+  <rect width="1200" height="768" fill="#f4f2ec"/>
+  <g fill="none" stroke="#d8d5cd" stroke-width="1">
+    <path d="M0 96H1200M0 192H1200M0 288H1200M0 384H1200M0 480H1200M0 576H1200M0 672H1200"/>
+    <path d="M150 0V768M300 0V768M450 0V768M600 0V768M750 0V768M900 0V768M1050 0V768"/>
+  </g>
+  <text x="68" y="74" fill="#77736a" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" letter-spacing="3">WEBMCP / SHARED CONTEXT</text>
+  <text x="68" y="145" fill="#1f201d" font-family="Georgia, serif" font-size="58">From selection to shared action</text>
+  <g font-family="Arial, sans-serif">
+    <g transform="translate(68 248)">
+      <rect width="240" height="286" rx="18" fill="#fffdfa" stroke="#cbc8c0" stroke-width="2"/>
+      <circle cx="44" cy="45" r="19" fill="#1f201d"/>
+      <text x="44" y="52" fill="#fff" font-size="20" text-anchor="middle">1</text>
+      <text x="28" y="104" fill="#1f201d" font-size="25" font-weight="600">Human selects</text>
+      <rect x="28" y="139" width="76" height="82" fill="#e8e6df" stroke="#aaa69c"/>
+      <rect x="117" y="139" width="94" height="58" fill="#dfe5ff" stroke="#365cff" stroke-width="3"/>
+      <path d="M154 210l17 37 8-15 16-7z" fill="#365cff"/>
+      <text x="28" y="258" fill="#77736a" font-size="16">One or more canvas items</text>
+    </g>
+    <g transform="translate(348 248)">
+      <rect width="240" height="286" rx="18" fill="#1f201d"/>
+      <circle cx="44" cy="45" r="19" fill="#365cff"/>
+      <text x="44" y="52" fill="#fff" font-size="20" text-anchor="middle">2</text>
+      <text x="28" y="104" fill="#fff" font-size="25" font-weight="600">Keyword appears</text>
+      <rect x="28" y="142" width="184" height="54" rx="12" fill="#fff"/>
+      <text x="120" y="176" fill="#1f201d" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" text-anchor="middle">open-thread</text>
+      <text x="28" y="236" fill="#b8b5ae" font-size="16">Temporary spoken reference</text>
+      <text x="28" y="261" fill="#b8b5ae" font-size="16">Stable across transcription</text>
+    </g>
+    <g transform="translate(628 248)">
+      <rect width="240" height="286" rx="18" fill="#fffdfa" stroke="#cbc8c0" stroke-width="2"/>
+      <circle cx="44" cy="45" r="19" fill="#1f201d"/>
+      <text x="44" y="52" fill="#fff" font-size="20" text-anchor="middle">3</text>
+      <text x="28" y="104" fill="#1f201d" font-size="25" font-weight="600">Agent resolves</text>
+      <text x="28" y="151" fill="#77736a" font-size="16">WebMCP returns:</text>
+      <text x="28" y="185" fill="#365cff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">type · content</text>
+      <text x="28" y="215" fill="#365cff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">comments · next tool</text>
+      <path d="M28 247h184" stroke="#cbc8c0"/>
+      <text x="28" y="269" fill="#77736a" font-size="15">No DOM inspection needed</text>
+    </g>
+    <g transform="translate(908 248)">
+      <rect width="224" height="286" rx="18" fill="#365cff"/>
+      <circle cx="44" cy="45" r="19" fill="#fff"/>
+      <text x="44" y="52" fill="#365cff" font-size="20" text-anchor="middle">4</text>
+      <text x="28" y="104" fill="#fff" font-size="25" font-weight="600">Shared action</text>
+      <path d="M29 150h166M29 184h126M29 218h146" stroke="#aebcff" stroke-width="10" stroke-linecap="round"/>
+      <text x="28" y="269" fill="#dce3ff" font-size="16">Visible intent and result</text>
+    </g>
+  </g>
+  <g fill="#365cff">
+    <path d="M318 385h20l-10-10zm280 0h20l-10-10zm280 0h20l-10-10z"/>
+  </g>
+  <text x="68" y="662" fill="#1f201d" font-family="Georgia, serif" font-size="34">The agent collaborates on the work—not on the webpage.</text>
+  <text x="68" y="707" fill="#77736a" font-family="Arial, sans-serif" font-size="18">Resolve → understand → communicate → act → report with the canonical keyword.</text>
+</svg>
