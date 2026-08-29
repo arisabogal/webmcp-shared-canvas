@@ -14,6 +14,7 @@ import { useWebMCP } from '@/useWebMCP'
 import type { AgentActivity, AgentReaction, CanvasElement, ElementType, KeywordGroup, Viewport } from '@/types'
 
 const STORAGE_KEY = 'shared-canvas-webmcp-demo-v2'
+const MIN_AGENT_REACTION_DURATION_MS = 3000
 
 type SelectionRect = { left: number; top: number; width: number; height: number }
 type StoredCanvasElement = Omit<CanvasElement, 'type'> & {
@@ -74,9 +75,10 @@ export default function CanvasApp() {
   const previewSelectionRef = useRef<string[] | null>(null)
   const reactionTimersRef = useRef<Map<string, number>>(new Map())
 
-  const showAgentReaction = useCallback((ids: string[], reaction: AgentReaction, duration = 1800) => {
+  const showAgentReaction = useCallback((ids: string[], reaction: AgentReaction, duration = MIN_AGENT_REACTION_DURATION_MS) => {
     const uniqueIds = [...new Set(ids)]
     if (!uniqueIds.length) return
+    const visibleDuration = Math.max(duration, MIN_AGENT_REACTION_DURATION_MS)
     setAgentReactions((current) => ({ ...current, ...Object.fromEntries(uniqueIds.map((id) => [id, reaction])) }))
     uniqueIds.forEach((id) => {
       const existingTimer = reactionTimersRef.current.get(id)
@@ -88,7 +90,7 @@ export default function CanvasApp() {
           return next
         })
         reactionTimersRef.current.delete(id)
-      }, duration)
+      }, visibleDuration)
       reactionTimersRef.current.set(id, timer)
     })
   }, [])
