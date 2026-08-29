@@ -52,12 +52,12 @@ button { color: inherit; }
 .selection-corners i:nth-child(1) { top: -4px; left: -4px; }.selection-corners i:nth-child(2) { top: -4px; right: -4px; }.selection-corners i:nth-child(3) { bottom: -4px; right: -4px; }.selection-corners i:nth-child(4) { bottom: -4px; left: -4px; }
 
 .image-fill { position: absolute; inset: 0; overflow: hidden; background: #ddd5c5; }
-.document-sheet { height: 100%; padding: 27px 27px 24px; background: #fbfaf5; }
+.document-sheet { height: 100%; min-height: 0; padding: 27px 27px 24px; display: flex; flex-direction: column; overflow: hidden; background: #fbfaf5; }
 .document-mark { display: flex; justify-content: space-between; align-items: center; color: #77736a; }
 .document-mark span, .slide-kicker, .note-body > span { font: 9px var(--font-mono), monospace; letter-spacing: .14em; }
-.document-sheet h2 { width: 80%; margin: 58px 0 17px; font-family: Georgia, serif; font-size: 30px; font-weight: 400; line-height: 1.05; outline: none; }
-.document-rule { height: 1px; background: #25231f; margin-bottom: 16px; }
-.document-sheet p { white-space: pre-line; color: #5d5a53; font: 12px/1.55 Georgia, serif; outline: none; }
+.document-sheet h2 { width: 80%; max-height: 64px; margin: 58px 0 17px; overflow: hidden; overflow-wrap: anywhere; flex: none; font-family: Georgia, serif; font-size: 30px; font-weight: 400; line-height: 1.05; outline: none; }
+.document-rule { height: 1px; margin-bottom: 16px; flex: none; background: #25231f; }
+.document-sheet p { min-height: 0; margin: 0; padding-bottom: 28px; overflow: hidden; overflow-wrap: anywhere; flex: 1; white-space: pre-line; color: #5d5a53; font: 12px/1.55 Georgia, serif; outline: none; }
 .page-number { position: absolute; right: 27px; bottom: 23px; font: 9px var(--font-mono), monospace; color: #8a867d; }
 .presentation-slide { height: 100%; padding: 24px 27px; overflow: hidden; color: #f8f4e9; background: #161713; }
 .presentation-slide.tone-warm { color: #251d18; background: #e8a67f; }
@@ -84,8 +84,8 @@ button { color: inherit; }
 .video-preview { height: 100%; position: relative; display: grid; place-items: center; background: radial-gradient(circle at 70% 30%, #60564e, #282825 70%); }
 .video-preview button { width: 52px; height: 52px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.45); border-radius: 50%; color: white; background: rgba(0,0,0,.16); }
 .video-preview > span { position: absolute; right: 15px; bottom: 13px; color: white; font: 9px var(--font-mono), monospace; }
-.note-body { height: 100%; padding: 24px; background: #f4e57e; }
-.note-body > span { color: #746c36; }.note-body p { margin: 36px 0 0; white-space: pre-line; font: 20px/1.25 Georgia, serif; outline: none; }
+.note-body { height: 100%; min-height: 0; padding: 24px; display: flex; flex-direction: column; overflow: hidden; background: #f4e57e; }
+.note-body > span { color: #746c36; flex: none; }.note-body p { min-height: 0; margin: 36px 0 0; overflow: hidden; overflow-wrap: anywhere; flex: 1; white-space: pre-line; font: 20px/1.25 Georgia, serif; outline: none; }
 .agent-brief { height: 100%; padding: 28px 32px; background: #fcfbf8; overflow: hidden; }
 .agent-brief-label { display: flex; align-items: center; gap: 7px; color: var(--blue); font: 9px var(--font-mono), monospace; text-transform: uppercase; letter-spacing: .08em; }
 .agent-brief-label span { margin-left: auto; padding: 4px 7px; border-radius: 10px; background: var(--blue-soft); animation: fadePulse 1s ease-in-out infinite; }
