@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ChevronDown, FileSpreadsheet, FileText, Globe2, Hand, Layers3,
+  FileSpreadsheet, FileText, Globe2, Hand, Layers3,
   Maximize2, MousePointer2, Plus,
-  Sparkles, StickyNote, Tags, Upload, Users, X, ZoomIn, ZoomOut,
+  Sparkles, StickyNote, Tags, Upload, X, ZoomIn, ZoomOut,
 } from 'lucide-react'
 import CanvasElementView from './CanvasElementView'
 import CommentsPanel from './CommentsPanel'
@@ -357,11 +357,10 @@ export default function CanvasApp() {
     <main className="app-shell">
       <header className="topbar">
         <div className="brand-mark" aria-label="Workspace home"><i /><i /><i /></div>
-        <button className="workspace-title">WebMCP workspace <ChevronDown size={14} /></button>
+        <div className="workspace-title">WebMCP workspace</div>
         <div className="topbar-right">
           <div className={`webmcp-state ${webMcpSupported ? 'connected' : ''}`} title={webMcpSupported ? 'WebMCP tools registered' : 'WebMCP unavailable in this browser'}><span /> WebMCP</div>
           <div className="avatars"><span>AS</span>{agentIsActive && <span className="agent-avatar" role="status" aria-label="Agent active on canvas" title="Agent active on canvas"><Sparkles size={12} /></span>}<button aria-label="Invite collaborators"><Plus size={14} /></button></div>
-          <button className="share-button"><Users size={15} /> Share</button>
         </div>
       </header>
 

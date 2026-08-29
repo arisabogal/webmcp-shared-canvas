@@ -19,7 +19,7 @@ button { color: inherit; }
 .brand-mark { width: 30px; height: 30px; border-radius: 8px; margin-right: 8px; display: grid; place-content: center; grid-template-columns: repeat(2, 5px); grid-template-rows: repeat(2, 5px); gap: 2px; background: var(--ink); transform: rotate(0deg); }
 .brand-mark i { display: block; width: 5px; height: 5px; border-radius: 1.5px; background: #fff; }
 .brand-mark i:last-child { grid-column: 2; background: #7790ff; }
-.workspace-title { height: 32px; display: flex; align-items: center; gap: 5px; border: 0; background: transparent; font-size: 13px; font-weight: 560; cursor: pointer; }
+.workspace-title { height: 32px; display: flex; align-items: center; font-size: 13px; font-weight: 560; }
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
 .webmcp-state { display: flex; align-items: center; gap: 6px; font: 10px var(--font-mono), monospace; text-transform: uppercase; letter-spacing: .06em; color: #8b8982; }
 .webmcp-state span { width: 6px; height: 6px; border-radius: 50%; background: #aaa7a0; }
@@ -29,7 +29,6 @@ button { color: inherit; }
 .avatars > :first-child { margin-left: 0; }
 .avatars .agent-avatar { background: var(--blue); color: white; animation: agentPresenceIn .2s cubic-bezier(.2,.8,.2,1); }
 .avatars button { padding: 0; border: 2px solid #f8f7f2; background: #e8e6df; cursor: pointer; }
-.share-button { height: 32px; display: flex; align-items: center; gap: 7px; padding: 0 12px; border: 0; border-radius: 8px; color: #fff; background: var(--ink); font-size: 12px; cursor: pointer; }
 
 .canvas-viewport { position: fixed; inset: 54px 0 0; overflow: hidden; touch-action: none; background-color: var(--paper); background-image: radial-gradient(rgba(32, 31, 28, .14) .7px, transparent .7px); background-size: 18px 18px; }
 .canvas-viewport.tool-hand { cursor: grab; }
@@ -176,7 +175,7 @@ button { color: inherit; }
 @keyframes focusOpen { from { opacity: 0; transform: scale(.992); } }
 
 @media (max-width: 720px) {
-  .webmcp-state, .share-button, .avatars > :first-child { display: none; }
+  .webmcp-state, .avatars > :first-child { display: none; }
   .workspace-title { max-width: 160px; overflow: hidden; white-space: nowrap; }
   .minimap { display: none; }
   .tool-rail { top: max(64px, calc(54px + env(safe-area-inset-top) + 10px)); left: max(10px, env(safe-area-inset-left)); }
