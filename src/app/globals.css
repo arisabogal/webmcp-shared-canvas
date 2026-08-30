@@ -20,6 +20,9 @@ button { color: inherit; }
 .brand-mark i { display: block; width: 5px; height: 5px; border-radius: 1.5px; background: #fff; }
 .brand-mark i:last-child { grid-column: 2; background: #7790ff; }
 .workspace-title { height: 32px; display: flex; align-items: center; font-size: 13px; font-weight: 560; }
+.expanded-keyword { min-width: 0; height: 26px; display: flex; align-items: center; gap: 7px; margin-left: 12px; padding-left: 12px; border-left: 1px solid var(--line); animation: keywordIn .18s ease-out; }
+.expanded-keyword span { color: #8b8982; font: 8px var(--font-mono), monospace; letter-spacing: .06em; text-transform: uppercase; }
+.expanded-keyword strong { min-width: 0; max-width: 210px; overflow: hidden; color: var(--blue); text-overflow: ellipsis; white-space: nowrap; font: 10px var(--font-mono), monospace; }
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
 .webmcp-state { display: flex; align-items: center; gap: 6px; font: 10px var(--font-mono), monospace; text-transform: uppercase; letter-spacing: .06em; color: #8b8982; }
 .webmcp-state span { width: 6px; height: 6px; border-radius: 50%; background: #aaa7a0; }
@@ -173,10 +176,14 @@ button { color: inherit; }
 @keyframes panelIn { from { opacity: 0; transform: translateX(12px); } }
 @keyframes activityIn { from { opacity: 0; transform: translateX(12px) scale(.98); } }
 @keyframes focusOpen { from { opacity: 0; transform: scale(.992); } }
+@keyframes keywordIn { from { opacity: 0; transform: translateY(2px); } }
 
 @media (max-width: 720px) {
   .webmcp-state, .avatars > :first-child { display: none; }
   .workspace-title { max-width: 160px; overflow: hidden; white-space: nowrap; }
+  .expanded-keyword { margin-left: 8px; padding-left: 8px; }
+  .expanded-keyword span { display: none; }
+  .expanded-keyword strong { max-width: 116px; }
   .minimap { display: none; }
   .tool-rail { top: max(64px, calc(54px + env(safe-area-inset-top) + 10px)); left: max(10px, env(safe-area-inset-left)); }
   .comments-panel { inset: auto 8px 8px; width: auto; max-height: 55dvh; }

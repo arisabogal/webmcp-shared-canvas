@@ -148,6 +148,11 @@ export default function CanvasApp() {
     })
   }, [])
 
+  const expandElement = useCallback((id: string) => {
+    selectIds([id])
+    setExpandedElementId(id)
+  }, [selectIds])
+
   useEffect(() => {
     if (!expandedElementId) return
     const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setExpandedElementId(null) }
@@ -199,6 +204,11 @@ export default function CanvasApp() {
     if (!selectedIds.length) return null
     return [...keywords].reverse().find((group) => group.expiresAt > keywordNow && sameIds(group.elementIds, selectedIds)) || null
   }, [keywordNow, keywords, selectedIds])
+
+  const expandedKeyword = useMemo(() => {
+    if (!expandedElementId) return null
+    return [...keywords].reverse().find((group) => group.expiresAt > keywordNow && sameIds(group.elementIds, [expandedElementId])) || null
+  }, [expandedElementId, keywordNow, keywords])
 
   const activeKeywordGroups = useMemo(() => {
     const currentTime = selectionMenuOpen ? selectionMenuNow : keywordNow
@@ -358,6 +368,12 @@ export default function CanvasApp() {
       <header className="topbar">
         <div className="brand-mark" aria-label="Workspace home"><i /><i /><i /></div>
         <div className="workspace-title">WebMCP workspace</div>
+        {expandedKeyword && (
+          <div className="expanded-keyword" role="status" aria-label={`Selection keyword ${expandedKeyword.keyword}`}>
+            <span>Selection</span>
+            <strong>{expandedKeyword.keyword}</strong>
+          </div>
+        )}
         <div className="topbar-right">
           <div className={`webmcp-state ${webMcpSupported ? 'connected' : ''}`} title={webMcpSupported ? 'WebMCP tools registered' : 'WebMCP unavailable in this browser'}><span /> WebMCP</div>
           <div className="avatars"><span>AS</span>{agentIsActive && <span className="agent-avatar" role="status" aria-label="Agent active on canvas" title="Agent active on canvas"><Sparkles size={12} /></span>}<button aria-label="Invite collaborators"><Plus size={14} /></button></div>
@@ -370,11 +386,11 @@ export default function CanvasApp() {
           {elements.map((element) => (
             <CanvasElementView key={element.id} element={element} selected={selectedIds.includes(element.id)} reaction={agentReactions[element.id]}
               onSelect={(event) => selectIds(event.shiftKey ? (selectedIds.includes(element.id) ? selectedIds.filter((id) => id !== element.id) : [...selectedIds, element.id]) : selectedIds.includes(element.id) ? selectedIds : [element.id])}
-              onDragStart={(event) => startElementDrag(event, element)} onOpenComments={() => setCommentElementId(element.id)} onExpand={() => setExpandedElementId(element.id)} onChange={(patch) => patchElement(element.id, patch)} />
+              onDragStart={(event) => startElementDrag(event, element)} onOpenComments={() => setCommentElementId(element.id)} onExpand={() => expandElement(element.id)} onChange={(patch) => patchElement(element.id, patch)} />
           ))}
         </div>
 
-        {latestKeyword && (
+        {latestKeyword && !expandedElement && (
           <div className="keyword-toast">
             <strong>{latestKeyword.keyword}</strong>
           </div>
