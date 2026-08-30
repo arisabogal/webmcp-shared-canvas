@@ -13,9 +13,9 @@ const CANVAS_AGENT_GUIDE = {
     'Treat short names and ordinary spoken phrases as possible live canvas selection keywords. For example, Open Thread may refer to the keyword open-thread.',
     'Expect speech-transcription errors. Resolve plausible misspellings, then always use the exact canonical keyword returned by canvas_resolve_reference when referring back to the selection.',
     'When the user refers to something on this canvas, call canvas_resolve_reference before inspecting the DOM, taking a browser screenshot, clicking, or using generic browser control.',
-    'Use the exact element IDs returned by canvas_resolve_reference for later reads, screenshots, comments, and updates.',
+    'Use the exact element IDs returned by canvas_resolve_reference for later reads, screenshots, comments, updates, and deletion.',
     'Use canvas_capture_selection when visual appearance matters. Use structured element data when the user only needs names, text, comments, or status.',
-    'Before every action that creates, updates, comments on, or otherwise changes canvas work, call canvas_communicate with state working to tell the human what you are about to do. Perform the action only after that notification is visible, then update the same activity with the result.',
+    'Before every action that creates, updates, deletes, comments on, or otherwise changes canvas work, call canvas_communicate with state working to tell the human what you are about to do. Perform the action only after that notification is visible, then update the same activity with the result.',
     'Selection keywords expire three minutes after creation. Resolve them promptly and do not ask the user to explain that a phrase is a keyword.',
     'Prefer the canvas WebMCP tools for canvas work. Use generic browser control only when no registered canvas tool can complete the requested action.',
   ],
@@ -170,6 +170,7 @@ type API = {
   setActivities: React.Dispatch<React.SetStateAction<AgentActivity[]>>
   focusElement: (id: string) => void
   showAgentReaction: (ids: string[], reaction: AgentReaction, duration?: number) => void
+  deleteElements: (ids: string[]) => void
 }
 
 export function useWebMCP(api: API, activeElement?: CanvasElement) {
@@ -360,6 +361,35 @@ export function useWebMCP(api: API, activeElement?: CanvasElement) {
       },
     })
     register({
+      name: 'canvas_delete_elements', title: 'Delete canvas items',
+      description: 'Permanently delete one or more canvas items after resolving their exact IDs. You MUST call canvas_communicate first and tell the human what you are about to delete. Deleted items are also removed from active selections and selection keywords.',
+      inputSchema: {
+        type: 'object', properties: {
+          elementIds: { type: 'array', items: { type: 'string' }, minItems: 1, uniqueItems: true, description: 'Exact item IDs returned by canvas_resolve_reference.' },
+          message: { type: 'string', description: 'Optional completion message shown in canvas activity.' },
+        }, required: ['elementIds'],
+      },
+      execute: async (input) => {
+        const requestedIds = [...new Set(Array.isArray(input.elementIds) ? input.elementIds.map(String) : [])]
+        if (!requestedIds.length) return { deleted: false, count: 0, error: 'Provide at least one exact canvas element ID.' }
+        const items = apiRef.current.getElements().filter((element) => requestedIds.includes(element.id))
+        const deletedElementIds = items.map((item) => item.id)
+        const missingElementIds = requestedIds.filter((id) => !deletedElementIds.includes(id))
+        if (!deletedElementIds.length) return { deleted: false, count: 0, deletedElementIds, missingElementIds, error: 'None of the requested canvas elements exist.' }
+        apiRef.current.deleteElements(deletedElementIds)
+        const defaultMessage = `Deleted ${items.length} canvas item${items.length === 1 ? '' : 's'}${items.length === 1 ? `: ${items[0].name}` : ''}`
+        const activity: AgentActivity = {
+          id: crypto.randomUUID(), message: String(input.message || defaultMessage), elementIds: deletedElementIds,
+          createdAt: Date.now(), state: 'done',
+        }
+        apiRef.current.setActivities((activities) => [activity, ...activities].slice(0, 12))
+        return {
+          deleted: true, count: deletedElementIds.length, deletedElementIds, missingElementIds,
+          deletedItems: items.map(({ id, name, type }) => ({ id, name, type })),
+        }
+      },
+    })
+    register({
       name: 'canvas_add_comment', title: 'Leave a canvas comment',
       description: 'Leave an agent comment attached to a canvas item. You MUST call canvas_communicate first and tell the human that you are about to add the comment before calling this tool.',
       inputSchema: { type: 'object', properties: { elementId: { type: 'string' }, body: { type: 'string' } }, required: ['elementId', 'body'] },
@@ -373,7 +403,7 @@ export function useWebMCP(api: API, activeElement?: CanvasElement) {
     })
     register({
       name: 'canvas_communicate', title: 'Communicate on canvas',
-      description: 'ALWAYS call this before any tool that creates, updates, comments on, or otherwise changes canvas work. First show a visible, non-blocking notification saying what you are about to do; only then perform the action. Afterward, update the same activityId with what changed or where human attention is needed. This makes agent work legible while it happens.',
+      description: 'ALWAYS call this before any tool that creates, updates, deletes, comments on, or otherwise changes canvas work. First show a visible, non-blocking notification saying what you are about to do; only then perform the action. Afterward, update the same activityId with what changed or where human attention is needed. This makes agent work legible while it happens.',
       inputSchema: {
         type: 'object', properties: {
           message: { type: 'string', description: 'Short human-readable status message.' },

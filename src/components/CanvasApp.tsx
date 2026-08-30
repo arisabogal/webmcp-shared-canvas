@@ -153,6 +153,25 @@ export default function CanvasApp() {
     setExpandedElementId(id)
   }, [selectIds])
 
+  const deleteElements = useCallback((ids: string[]) => {
+    const deletedIds = new Set(ids)
+    if (!deletedIds.size) return
+    setElements((items) => items.filter((item) => !deletedIds.has(item.id)))
+    setKeywords((groups) => groups
+      .map((group) => ({ ...group, elementIds: group.elementIds.filter((id) => !deletedIds.has(id)) }))
+      .filter((group) => group.elementIds.length > 0))
+    setSelectedIds((current) => current.filter((id) => !deletedIds.has(id)))
+    setExpandedElementId((current) => current && deletedIds.has(current) ? null : current)
+    setCommentElementId((current) => current && deletedIds.has(current) ? null : current)
+    setAgentReactions((current) => Object.fromEntries(Object.entries(current).filter(([id]) => !deletedIds.has(id))))
+    previewSelectionRef.current = previewSelectionRef.current?.filter((id) => !deletedIds.has(id)) || null
+    deletedIds.forEach((id) => {
+      const timer = reactionTimersRef.current.get(id)
+      if (timer) window.clearTimeout(timer)
+      reactionTimersRef.current.delete(id)
+    })
+  }, [])
+
   useEffect(() => {
     if (!expandedElementId) return
     const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setExpandedElementId(null) }
@@ -192,7 +211,7 @@ export default function CanvasApp() {
     getElements: () => elements,
     getKeywords: () => keywords,
     getActiveElement: () => elements.find((element) => element.id === expandedElementId),
-    setElements, setKeywords, setSelectedIds: selectIds, setActivities, focusElement, showAgentReaction,
+    setElements, setKeywords, setSelectedIds: selectIds, setActivities, focusElement, showAgentReaction, deleteElements,
   }, expandedElement)
   const agentIsActive = webMcpSupported && (
     activities.some((activity) => activity.state === 'working')
