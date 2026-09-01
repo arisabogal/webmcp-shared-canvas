@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { toPng } from 'html-to-image'
-import type { AgentActivity, AgentReaction, CanvasElement, KeywordGroup } from './types'
+import type { AgentActivity, AgentReaction, CanvasElement, DeleteApprovalDecision, DeleteApprovalItem, KeywordGroup } from './types'
 import { createElement, KEYWORD_TTL_MS } from './data'
 
 const TRANSPARENT_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
@@ -171,6 +171,7 @@ type API = {
   focusElement: (id: string) => void
   showAgentReaction: (ids: string[], reaction: AgentReaction, duration?: number) => void
   deleteElements: (ids: string[]) => void
+  requestDeleteApproval: (items: DeleteApprovalItem[], signal?: AbortSignal) => Promise<DeleteApprovalDecision>
 }
 
 export function useWebMCP(api: API, activeElement?: CanvasElement) {
@@ -362,20 +363,36 @@ export function useWebMCP(api: API, activeElement?: CanvasElement) {
     })
     register({
       name: 'canvas_delete_elements', title: 'Delete canvas items',
-      description: 'Permanently delete one or more canvas items after resolving their exact IDs. You MUST call canvas_communicate first and tell the human what you are about to delete. Deleted items are also removed from active selections and selection keywords.',
+      description: 'Request permanent deletion of one or more canvas items after resolving their exact IDs. You MUST call canvas_communicate first and tell the human what you want to delete. This tool then pauses for explicit human approval in the canvas; never claim deletion succeeded unless the returned deleted field is true. Deleted items are also removed from active selections and selection keywords.',
       inputSchema: {
         type: 'object', properties: {
           elementIds: { type: 'array', items: { type: 'string' }, minItems: 1, uniqueItems: true, description: 'Exact item IDs returned by canvas_resolve_reference.' },
           message: { type: 'string', description: 'Optional completion message shown in canvas activity.' },
         }, required: ['elementIds'],
       },
-      execute: async (input) => {
+      execute: async (input, options) => {
         const requestedIds = [...new Set(Array.isArray(input.elementIds) ? input.elementIds.map(String) : [])]
         if (!requestedIds.length) return { deleted: false, count: 0, error: 'Provide at least one exact canvas element ID.' }
         const items = apiRef.current.getElements().filter((element) => requestedIds.includes(element.id))
         const deletedElementIds = items.map((item) => item.id)
         const missingElementIds = requestedIds.filter((id) => !deletedElementIds.includes(id))
         if (!deletedElementIds.length) return { deleted: false, count: 0, deletedElementIds, missingElementIds, error: 'None of the requested canvas elements exist.' }
+        const decision = await apiRef.current.requestDeleteApproval(
+          items.map(({ id, name, type }) => ({ id, name, type })),
+          options?.signal,
+        )
+        if (decision !== 'approved') {
+          const reason = decision === 'declined' ? 'human_declined' : decision === 'busy' ? 'another_approval_is_pending' : 'request_canceled'
+          const activity: AgentActivity = {
+            id: crypto.randomUUID(),
+            message: decision === 'declined' ? 'Deletion canceled — canvas items were kept' : 'Deletion request canceled',
+            elementIds: deletedElementIds,
+            createdAt: Date.now(),
+            state: decision === 'declined' ? 'done' : 'attention',
+          }
+          apiRef.current.setActivities((activities) => [activity, ...activities].slice(0, 12))
+          return { deleted: false, count: 0, deletedElementIds: [], missingElementIds, reason }
+        }
         apiRef.current.deleteElements(deletedElementIds)
         const defaultMessage = `Deleted ${items.length} canvas item${items.length === 1 ? '' : 's'}${items.length === 1 ? `: ${items[0].name}` : ''}`
         const activity: AgentActivity = {

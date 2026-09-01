@@ -8,20 +8,21 @@ import {
 } from 'lucide-react'
 import CanvasElementView from './CanvasElementView'
 import CommentsPanel from './CommentsPanel'
+import DeleteApprovalDialog from './DeleteApprovalDialog'
 import FocusMode from './FocusMode'
-import { createElement, initialElements, KEYWORD_TTL_MS, makeKeyword, WEBMCP_SPEC_URL } from '@/data'
+import { createElement, initialElements, KEYWORD_TTL_MS, makeKeyword } from '@/data'
 import { useWebMCP } from '@/useWebMCP'
-import type { AgentActivity, AgentReaction, CanvasElement, ElementType, KeywordGroup, Viewport } from '@/types'
+import type { AgentActivity, AgentReaction, CanvasElement, DeleteApprovalDecision, DeleteApprovalItem, ElementType, KeywordGroup, Viewport } from '@/types'
 
-const STORAGE_KEY = 'shared-canvas-webmcp-demo-v2'
 const MIN_AGENT_REACTION_DURATION_MS = 3000
 
 type SelectionRect = { left: number; top: number; width: number; height: number }
-type StoredCanvasElement = Omit<CanvasElement, 'type'> & {
-  type: string
-  slides?: Array<{ kicker?: string; title?: string; subtitle?: string }>
+type DeleteApprovalRequest = { id: string; items: DeleteApprovalItem[] }
+type PendingDeleteApproval = DeleteApprovalRequest & {
+  resolve: (decision: DeleteApprovalDecision) => void
+  signal?: AbortSignal
+  abortHandler?: () => void
 }
-
 const selectionKey = (ids: string[]) => [...new Set(ids)].sort().join('\u001f')
 
 function sameIds(a: string[], b: string[]) { return selectionKey(a) === selectionKey(b) }
@@ -29,26 +30,6 @@ function sameIds(a: string[], b: string[]) { return selectionKey(a) === selectio
 function remainingTime(expiresAt: number, now: number) {
   const seconds = Math.max(0, Math.ceil((expiresAt - now) / 1000))
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
-}
-
-function normalizeStoredElement(element: StoredCanvasElement): CanvasElement {
-  const lowerName = element.name.toLowerCase()
-  const legacySlides = element.slides
-  const canonicalType: ElementType =
-    element.type === 'note' ? 'note'
-      : element.type === 'image' ? 'image'
-        : element.type === 'website' || element.type === 'web' || element.type === 'video' ? 'website'
-          : element.type === 'csv' || lowerName.endsWith('.csv') ? 'csv'
-            : element.type === 'pdf' || lowerName.endsWith('.pdf') || element.src?.startsWith('data:application/pdf') ? 'pdf'
-              : 'document'
-  const slideContent = legacySlides?.map((slide) => [slide.kicker, slide.title, slide.subtitle].filter(Boolean).join('\n')).join('\n\n')
-  return {
-    id: element.id, type: canonicalType, name: element.name,
-    x: element.x, y: element.y, width: element.width, height: element.height,
-    content: element.id === 'webmcp-spec' ? 'developer.chrome.com/docs/ai/webmcp' : element.content || slideContent,
-    src: element.id === 'webmcp-spec' ? WEBMCP_SPEC_URL : element.src, status: element.status,
-    comments: element.comments, createdBy: element.createdBy, createdAt: element.createdAt,
-  }
 }
 
 export default function CanvasApp() {
@@ -69,11 +50,12 @@ export default function CanvasApp() {
   const [selectionRect, setSelectionRect] = useState<SelectionRect | null>(null)
   const [keywordNow, setKeywordNow] = useState(0)
   const [selectionMenuNow, setSelectionMenuNow] = useState(0)
-  const [hydrated, setHydrated] = useState(false)
+  const [deleteApprovalRequest, setDeleteApprovalRequest] = useState<DeleteApprovalRequest | null>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const previewSelectionRef = useRef<string[] | null>(null)
   const reactionTimersRef = useRef<Map<string, number>>(new Map())
+  const pendingDeleteApprovalRef = useRef<PendingDeleteApproval | null>(null)
 
   const showAgentReaction = useCallback((ids: string[], reaction: AgentReaction, duration = MIN_AGENT_REACTION_DURATION_MS) => {
     const uniqueIds = [...new Set(ids)]
@@ -99,30 +81,6 @@ export default function CanvasApp() {
     reactionTimersRef.current.forEach((timer) => window.clearTimeout(timer))
     reactionTimersRef.current.clear()
   }, [])
-
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      try {
-        const saved = localStorage.getItem(STORAGE_KEY)
-        if (saved) {
-          const parsed = JSON.parse(saved) as { elements?: StoredCanvasElement[]; keywords?: KeywordGroup[]; activities?: AgentActivity[] }
-          if (parsed.elements?.length) setElements(parsed.elements.map(normalizeStoredElement))
-          if (parsed.keywords) {
-            const currentTime = Date.now()
-            setKeywords(parsed.keywords.map((group) => ({ ...group, expiresAt: group.expiresAt || group.createdAt + KEYWORD_TTL_MS })).filter((group) => group.expiresAt > currentTime))
-          }
-          if (parsed.activities) setActivities(parsed.activities.filter((activity) => activity.state !== 'working'))
-        }
-      } catch { /* start from the demo canvas */ }
-      setHydrated(true)
-    })
-    return () => window.cancelAnimationFrame(frame)
-  }, [])
-
-  useEffect(() => {
-    if (!hydrated) return
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ elements, keywords, activities }))
-  }, [elements, keywords, activities, hydrated])
 
   const selectIds = useCallback((ids: string[]) => {
     const normalizedIds = [...new Set(ids)]
@@ -172,6 +130,42 @@ export default function CanvasApp() {
     })
   }, [])
 
+  const settleDeleteApproval = useCallback((decision: DeleteApprovalDecision) => {
+    const pending = pendingDeleteApprovalRef.current
+    if (!pending) return
+    if (pending.signal && pending.abortHandler) pending.signal.removeEventListener('abort', pending.abortHandler)
+    pendingDeleteApprovalRef.current = null
+    setDeleteApprovalRequest(null)
+    pending.resolve(decision)
+  }, [])
+
+  const requestDeleteApproval = useCallback((items: DeleteApprovalItem[], signal?: AbortSignal) => {
+    if (pendingDeleteApprovalRef.current) return Promise.resolve<DeleteApprovalDecision>('busy')
+    if (signal?.aborted) return Promise.resolve<DeleteApprovalDecision>('canceled')
+
+    return new Promise<DeleteApprovalDecision>((resolve) => {
+      const request: DeleteApprovalRequest = { id: crypto.randomUUID(), items }
+      const abortHandler = () => {
+        if (pendingDeleteApprovalRef.current?.id !== request.id) return
+        settleDeleteApproval('canceled')
+      }
+      pendingDeleteApprovalRef.current = { ...request, resolve, signal, abortHandler }
+      signal?.addEventListener('abort', abortHandler, { once: true })
+      setDeleteApprovalRequest(request)
+    })
+  }, [settleDeleteApproval])
+
+  const approveDeleteRequest = useCallback(() => settleDeleteApproval('approved'), [settleDeleteApproval])
+  const declineDeleteRequest = useCallback(() => settleDeleteApproval('declined'), [settleDeleteApproval])
+
+  useEffect(() => () => {
+    const pending = pendingDeleteApprovalRef.current
+    if (!pending) return
+    if (pending.signal && pending.abortHandler) pending.signal.removeEventListener('abort', pending.abortHandler)
+    pending.resolve('canceled')
+    pendingDeleteApprovalRef.current = null
+  }, [])
+
   useEffect(() => {
     if (!expandedElementId) return
     const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setExpandedElementId(null) }
@@ -211,7 +205,7 @@ export default function CanvasApp() {
     getElements: () => elements,
     getKeywords: () => keywords,
     getActiveElement: () => elements.find((element) => element.id === expandedElementId),
-    setElements, setKeywords, setSelectedIds: selectIds, setActivities, focusElement, showAgentReaction, deleteElements,
+    setElements, setKeywords, setSelectedIds: selectIds, setActivities, focusElement, showAgentReaction, deleteElements, requestDeleteApproval,
   }, expandedElement)
   const agentIsActive = webMcpSupported && (
     activities.some((activity) => activity.state === 'working')
@@ -484,6 +478,14 @@ export default function CanvasApp() {
           <button className="activity-dismiss" aria-label="Dismiss notification" onClick={() => setActivities((items) => items.filter((item) => item.id !== activity.id))}><X size={12} /></button>
         </div>
       ))}</div>}
+
+      {deleteApprovalRequest && (
+        <DeleteApprovalDialog
+          items={deleteApprovalRequest.items}
+          onApprove={approveDeleteRequest}
+          onDecline={declineDeleteRequest}
+        />
+      )}
 
       {commentElement && <CommentsPanel element={commentElement} onClose={() => setCommentElementId(null)} onUpdate={(next) => setElements((items) => items.map((item) => item.id === next.id ? next : item))} />}
       {expandedElement && <FocusMode element={expandedElement} onClose={() => setExpandedElementId(null)} onChange={(patch) => patchElement(expandedElement.id, patch)} onOpenComments={() => setCommentElementId(expandedElement.id)} />}

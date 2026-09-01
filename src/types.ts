@@ -41,6 +41,9 @@ export type AgentActivity = {
   state: 'working' | 'done' | 'attention'
 }
 
+export type DeleteApprovalItem = Pick<CanvasElement, 'id' | 'name' | 'type'>
+export type DeleteApprovalDecision = 'approved' | 'declined' | 'canceled' | 'busy'
+
 export type Viewport = { x: number; y: number; scale: number }
 
 declare global {
