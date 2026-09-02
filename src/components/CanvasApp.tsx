@@ -512,7 +512,7 @@ export default function CanvasApp() {
               data-region-id={region.id}
               key={region.id}
               onPointerDown={(event) => event.stopPropagation()}
-              onClick={() => selectRegion(region.id)}
+              onClick={() => deleteRegion(region.id)}
               style={{ transform: `translate(${region.x}px, ${region.y}px)`, width: `${region.width}px`, height: `${region.height}px` }}
             >
               <button className="region-keyword" onClick={(event) => { event.stopPropagation(); selectRegion(region.id) }} title="Select this canvas region">
