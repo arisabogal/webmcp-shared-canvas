@@ -129,6 +129,13 @@ button { color: inherit; }
 .keyword-toast { position: fixed; z-index: 40; top: max(66px, calc(54px + env(safe-area-inset-top) + 12px)); left: 50%; width: max-content; max-width: calc(100vw - 24px); height: 36px; transform: translateX(-50%); display: flex; align-items: center; padding: 0 13px; overflow: hidden; border: 0; border-radius: 9px; background: rgba(250,250,250,.96); box-shadow: 0 9px 26px rgba(28,27,24,.14); backdrop-filter: blur(12px); }
 .keyword-toast strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 11px var(--font-mono), monospace; }
 .selection-marquee { position: absolute; z-index: 28; border: 1px solid var(--blue); background: rgba(54, 92, 255, .08); box-shadow: inset 0 0 0 1px rgba(255,255,255,.45); pointer-events: none; }
+.canvas-region { position: absolute; top: 0; left: 0; border: 1px dashed rgba(54,92,255,.52); background: rgba(54,92,255,.035); pointer-events: none; animation: regionIn .18s ease-out; }
+.canvas-region.selected { border-style: solid; border-color: var(--blue); background: rgba(54,92,255,.07); box-shadow: 0 0 0 1px rgba(54,92,255,.16); }
+.canvas-region.point { width: 0 !important; height: 0 !important; border: 0; background: transparent; }
+.canvas-region.point::before { content: ''; position: absolute; width: 14px; height: 14px; transform: translate(-7px, -7px); border: 1px solid rgba(54,92,255,.7); border-radius: 50%; background: rgba(54,92,255,.08); }
+.canvas-region.point::after { content: ''; position: absolute; width: 4px; height: 4px; transform: translate(-2px, -2px); border-radius: 50%; background: var(--blue); }
+.canvas-region > button { position: absolute; top: -24px; left: -1px; max-width: 180px; height: 20px; padding: 0 7px; overflow: hidden; border: 0; border-radius: 5px; color: white; background: var(--blue); text-overflow: ellipsis; white-space: nowrap; font: 9px var(--font-mono), monospace; pointer-events: auto; cursor: pointer; }
+.canvas-region:not(.selected) > button { color: var(--blue); background: rgba(247,247,244,.94); box-shadow: inset 0 0 0 1px rgba(54,92,255,.22); }
 
 .activity-stack { position: fixed; z-index: 170; right: max(12px, env(safe-area-inset-right)); top: max(68px, calc(54px + env(safe-area-inset-top) + 14px)); width: 286px; max-width: calc(100vw - 24px); max-height: calc(100dvh - 82px); display: flex; flex-direction: column; gap: 7px; overflow: hidden; }
 .activity-note { min-height: 48px; display: flex; align-items: center; border: 1px solid rgba(54,92,255,.18); border-radius: 11px; background: rgba(252,251,248,.96); box-shadow: 0 9px 26px rgba(30,28,23,.1); backdrop-filter: blur(14px); animation: activityIn .28s cubic-bezier(.2,.8,.2,1); }
@@ -161,6 +168,7 @@ button { color: inherit; }
 .mini-world { position: relative; height: 85px; overflow: hidden; background-image: radial-gradient(#c5c2bb .5px, transparent .5px); background-size: 6px 6px; }
 .mini-world i { position: absolute; display: block; max-width: 52px; max-height: 40px; border: 1px solid #aaa69d; background: #d9d6ce; }
 .mini-world i.selected { border-color: var(--blue); background: #b9c4ff; }.mini-world > span { position: absolute; width: 100px; height: 60px; border: 1px solid rgba(54,92,255,.5); background: rgba(54,92,255,.04); }
+.mini-world i.region { border-style: dashed; border-color: rgba(54,92,255,.65); background: rgba(54,92,255,.06); }
 
 .comments-panel { position: fixed; z-index: 150; top: 66px; right: 12px; width: 320px; max-height: calc(100dvh - 80px); display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 13px; background: rgba(253,252,249,.97); box-shadow: 0 20px 50px rgba(30,28,23,.15); backdrop-filter: blur(18px); animation: panelIn .23s ease-out; }
 .comments-panel header { min-height: 58px; display: flex; align-items: center; padding: 0 13px 0 16px; border-bottom: 1px solid var(--line); }.comments-panel header div { display: flex; flex-direction: column; flex: 1; min-width: 0; }.comments-panel header span { color: #8a877f; font-size: 9px; }.comments-panel header strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
@@ -194,6 +202,7 @@ button { color: inherit; }
 @keyframes activityIn { from { opacity: 0; transform: translateX(12px) scale(.98); } }
 @keyframes focusOpen { from { opacity: 0; transform: scale(.992); } }
 @keyframes keywordIn { from { opacity: 0; transform: translateY(2px); } }
+@keyframes regionIn { from { opacity: 0; } }
 @keyframes approvalBackdropIn { from { opacity: 0; } }
 @keyframes approvalDialogIn { from { opacity: 0; transform: translateY(8px) scale(.985); } }
 

@@ -12,7 +12,7 @@ import DeleteApprovalDialog from './DeleteApprovalDialog'
 import FocusMode from './FocusMode'
 import { createElement, initialElements, KEYWORD_TTL_MS, makeKeyword } from '@/data'
 import { useWebMCP } from '@/useWebMCP'
-import type { AgentActivity, AgentReaction, CanvasElement, DeleteApprovalDecision, DeleteApprovalItem, ElementType, KeywordGroup, Viewport } from '@/types'
+import type { AgentActivity, AgentReaction, CanvasElement, CanvasRegion, DeleteApprovalDecision, DeleteApprovalItem, ElementType, KeywordGroup, Viewport } from '@/types'
 
 const MIN_AGENT_REACTION_DURATION_MS = 3000
 
@@ -38,6 +38,8 @@ export default function CanvasApp() {
   const [activities, setActivities] = useState<AgentActivity[]>([])
   const [agentReactions, setAgentReactions] = useState<Record<string, AgentReaction>>({})
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [regions, setRegions] = useState<CanvasRegion[]>([])
+  const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null)
   const [viewport, setViewport] = useState<Viewport>({ x: 60, y: 34, scale: 0.82 })
   const [tool, setTool] = useState<'select' | 'hand'>('select')
   const [addOpen, setAddOpen] = useState(false)
@@ -84,6 +86,7 @@ export default function CanvasApp() {
 
   const selectIds = useCallback((ids: string[]) => {
     const normalizedIds = [...new Set(ids)]
+    setSelectedRegionId(null)
     setSelectedIds(normalizedIds)
     if (!normalizedIds.length) return
     const selectedAt = Date.now()
@@ -105,6 +108,39 @@ export default function CanvasApp() {
       }].slice(-40)
     })
   }, [])
+
+  const selectRegion = useCallback((id: string) => {
+    const selectedAt = Date.now()
+    setKeywordNow(selectedAt)
+    setSelectedIds([])
+    setSelectedRegionId(id)
+    setRegions((items) => items.map((item) => item.id === id ? {
+      ...item,
+      createdAt: selectedAt,
+      expiresAt: selectedAt + KEYWORD_TTL_MS,
+    } : item))
+  }, [])
+
+  const createRegion = useCallback((rect: SelectionRect) => {
+    const createdAt = Date.now()
+    const region: CanvasRegion = {
+      id: `region-${crypto.randomUUID()}`,
+      keyword: makeKeyword([
+        ...keywords,
+        ...regions.map((item) => ({ keyword: item.keyword, elementIds: [], createdAt: item.createdAt, expiresAt: item.expiresAt })),
+      ]),
+      x: Math.round((rect.left - viewport.x) / viewport.scale),
+      y: Math.round((rect.top - viewport.y) / viewport.scale),
+      width: Math.round(rect.width / viewport.scale),
+      height: Math.round(rect.height / viewport.scale),
+      createdAt,
+      expiresAt: createdAt + KEYWORD_TTL_MS,
+    }
+    setRegions((items) => [...items.filter((item) => item.expiresAt > createdAt), region].slice(-40))
+    setSelectedIds([])
+    setSelectedRegionId(region.id)
+    setKeywordNow(createdAt)
+  }, [keywords, regions, viewport])
 
   const expandElement = useCallback((id: string) => {
     selectIds([id])
@@ -200,10 +236,26 @@ export default function CanvasApp() {
     })
   }, [elements])
 
+  const focusRegion = useCallback((region: CanvasRegion) => {
+    if (!canvasRef.current) return
+    const rect = canvasRef.current.getBoundingClientRect()
+    const width = Math.max(1, region.width)
+    const height = Math.max(1, region.height)
+    const scale = region.width || region.height
+      ? Math.min(1.1, Math.max(.32, Math.min((rect.width - 180) / width, (rect.height - 150) / height)))
+      : viewport.scale
+    setViewport({
+      scale,
+      x: rect.width / 2 - (region.x + region.width / 2) * scale,
+      y: rect.height / 2 - (region.y + region.height / 2) * scale,
+    })
+  }, [viewport.scale])
+
   const expandedElement = elements.find((element) => element.id === expandedElementId)
   const webMcpSupported = useWebMCP({
     getElements: () => elements,
     getKeywords: () => keywords,
+    getRegions: () => regions,
     getActiveElement: () => elements.find((element) => element.id === expandedElementId),
     setElements, setKeywords, setSelectedIds: selectIds, setActivities, focusElement, showAgentReaction, deleteElements, requestDeleteApproval,
   }, expandedElement)
@@ -230,6 +282,24 @@ export default function CanvasApp() {
       .sort((a, b) => b.createdAt - a.createdAt)
   }, [keywordNow, keywords, selectionMenuNow, selectionMenuOpen])
 
+  const activeRegions = useMemo(() => {
+    const currentTime = selectionMenuOpen ? selectionMenuNow : keywordNow
+    return [...regions]
+      .filter((region) => region.expiresAt > currentTime)
+      .sort((a, b) => b.createdAt - a.createdAt)
+  }, [keywordNow, regions, selectionMenuNow, selectionMenuOpen])
+
+  const selectedRegion = activeRegions.find((region) => region.id === selectedRegionId) || null
+
+  useEffect(() => {
+    const nextExpiry = [...keywords.map((group) => group.expiresAt), ...regions.map((region) => region.expiresAt)]
+      .filter((expiresAt) => expiresAt > keywordNow)
+      .sort((a, b) => a - b)[0]
+    if (!nextExpiry) return
+    const timeout = window.setTimeout(() => setKeywordNow(Date.now()), Math.max(0, nextExpiry - Date.now()) + 16)
+    return () => window.clearTimeout(timeout)
+  }, [keywordNow, keywords, regions])
+
   useEffect(() => {
     if (!selectionMenuOpen) return
     const interval = window.setInterval(() => setSelectionMenuNow(Date.now()), 1000)
@@ -251,6 +321,13 @@ export default function CanvasApp() {
     previewSelectionRef.current = null
     selectIds(group.elementIds)
     focusSelection(group.elementIds)
+    setSelectionMenuOpen(false)
+  }
+
+  const commitRegion = (region: CanvasRegion) => {
+    previewSelectionRef.current = null
+    selectRegion(region.id)
+    focusRegion(region)
     setSelectionMenuOpen(false)
   }
 
@@ -328,6 +405,7 @@ export default function CanvasApp() {
     const start = { x: event.clientX - bounds.left, y: event.clientY - bounds.top }
     const retainedIds = event.shiftKey ? selectedIds : []
     let moved = false
+    let finalRect: SelectionRect = { left: start.x, top: start.y, width: 0, height: 0 }
     setSelectionRect({ left: start.x, top: start.y, width: 0, height: 0 })
     const move = (moveEvent: PointerEvent) => {
       const current = { x: moveEvent.clientX - bounds.left, y: moveEvent.clientY - bounds.top }
@@ -335,6 +413,7 @@ export default function CanvasApp() {
         left: Math.min(start.x, current.x), top: Math.min(start.y, current.y),
         width: Math.abs(current.x - start.x), height: Math.abs(current.y - start.y),
       }
+      finalRect = rect
       moved ||= rect.width > 3 || rect.height > 3
       setSelectionRect(rect)
       const worldRect = {
@@ -356,13 +435,14 @@ export default function CanvasApp() {
       }
     }
     const up = () => {
-      selectIds(moved ? currentIds : retainedIds)
+      if (currentIds.length) selectIds(currentIds)
+      else if (!retainedIds.length) createRegion(moved ? finalRect : { left: start.x, top: start.y, width: 0, height: 0 })
       setSelectionRect(null)
       window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up)
     }
     let currentIds = retainedIds
     let currentSignature = selectionKey(retainedIds)
-    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up)
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up, { once: true })
   }
 
   const handleWheel = (event: React.WheelEvent) => {
@@ -401,11 +481,23 @@ export default function CanvasApp() {
               onSelect={(event) => selectIds(event.shiftKey ? (selectedIds.includes(element.id) ? selectedIds.filter((id) => id !== element.id) : [...selectedIds, element.id]) : selectedIds.includes(element.id) ? selectedIds : [element.id])}
               onDragStart={(event) => startElementDrag(event, element)} onOpenComments={() => setCommentElementId(element.id)} onExpand={() => expandElement(element.id)} onChange={(patch) => patchElement(element.id, patch)} />
           ))}
+          {activeRegions.map((region) => (
+            <div
+              className={`canvas-region ${region.width === 0 && region.height === 0 ? 'point' : ''} ${selectedRegionId === region.id ? 'selected' : ''}`}
+              data-region-id={region.id}
+              key={region.id}
+              style={{ transform: `translate(${region.x}px, ${region.y}px)`, width: `${region.width}px`, height: `${region.height}px` }}
+            >
+              <button onPointerDown={(event) => event.stopPropagation()} onClick={() => selectRegion(region.id)} title="Select this canvas region">
+                {region.keyword}
+              </button>
+            </div>
+          ))}
         </div>
 
-        {latestKeyword && !expandedElement && (
+        {(selectedRegion || latestKeyword) && !expandedElement && (
           <div className="keyword-toast">
-            <strong>{latestKeyword.keyword}</strong>
+            <strong>{selectedRegion?.keyword || latestKeyword?.keyword}</strong>
           </div>
         )}
 
@@ -432,8 +524,20 @@ export default function CanvasApp() {
               title="Selections"
             ><Tags size={18} /></button>
             {selectionMenuOpen && <div className="selection-menu-popover" onPointerDown={(event) => event.stopPropagation()} onMouseLeave={restoreSelectionPreview}>
-              <div className="selection-menu-label">Active selections</div>
-              {activeKeywordGroups.length ? activeKeywordGroups.map((group) => (
+              <div className="selection-menu-label">Active references</div>
+              {activeRegions.map((region) => (
+                <button
+                  className={region.id === selectedRegionId ? 'current' : ''}
+                  key={region.id}
+                  onClick={() => commitRegion(region)}
+                  title={`Show ${region.width || 0} × ${region.height || 0} canvas region`}
+                >
+                  <strong>{region.keyword}</strong>
+                  <time dateTime={`PT${Math.max(0, Math.ceil((region.expiresAt - selectionMenuNow) / 1000))}S`} title="Time remaining">{remainingTime(region.expiresAt, selectionMenuNow)}</time>
+                  <span className="selection-count">R</span>
+                </button>
+              ))}
+              {activeKeywordGroups.map((group) => (
                 <button
                   className={sameIds(group.elementIds, selectedIds) ? 'current' : ''}
                   key={group.keyword}
@@ -445,7 +549,8 @@ export default function CanvasApp() {
                   <time dateTime={`PT${Math.max(0, Math.ceil((group.expiresAt - selectionMenuNow) / 1000))}S`} title="Time remaining">{remainingTime(group.expiresAt, selectionMenuNow)}</time>
                   <span className="selection-count">{group.elementIds.length}</span>
                 </button>
-              )) : <p>No active selections</p>}
+              ))}
+              {!activeKeywordGroups.length && !activeRegions.length && <p>No active references</p>}
             </div>}
           </div>
           <div className="add-wrap"><button className={addOpen || linkOpen ? 'active' : ''} onClick={() => { restoreSelectionPreview(); setSelectionMenuOpen(false); setAddOpen(!addOpen); setLinkOpen(false); setLinkError(false) }} title="Add element"><Plus size={19} /></button>
@@ -467,7 +572,7 @@ export default function CanvasApp() {
 
         <div className="zoom-control"><button onClick={() => setViewport((v) => ({ ...v, scale: Math.max(.32, v.scale - .1) }))}><ZoomOut size={14} /></button><span>{Math.round(viewport.scale * 100)}%</span><button onClick={() => setViewport((v) => ({ ...v, scale: Math.min(1.6, v.scale + .1) }))}><ZoomIn size={14} /></button><button onClick={() => setViewport({ x: 60, y: 34, scale: .82 })}><Maximize2 size={14} /></button></div>
 
-        <div className="minimap"><div className="minimap-label"><Layers3 size={11} /> Canvas</div><div className="mini-world">{elements.map((element) => <i key={element.id} className={selectedIds.includes(element.id) ? 'selected' : ''} style={{ left: `${6 + element.x / 10}px`, top: `${14 + element.y / 10}px`, width: `${Math.max(8, element.width / 10)}px`, height: `${Math.max(5, element.height / 10)}px` }} />)}<span style={{ transform: `translate(${Math.max(2, -viewport.x / 10)}px, ${Math.max(2, -viewport.y / 10)}px)` }} /></div></div>
+        <div className="minimap"><div className="minimap-label"><Layers3 size={11} /> Canvas</div><div className="mini-world">{elements.map((element) => <i key={element.id} className={selectedIds.includes(element.id) ? 'selected' : ''} style={{ left: `${6 + element.x / 10}px`, top: `${14 + element.y / 10}px`, width: `${Math.max(8, element.width / 10)}px`, height: `${Math.max(5, element.height / 10)}px` }} />)}{activeRegions.map((region) => <i key={region.id} className={`region ${selectedRegionId === region.id ? 'selected' : ''}`} style={{ left: `${6 + region.x / 10}px`, top: `${14 + region.y / 10}px`, width: `${Math.max(3, region.width / 10)}px`, height: `${Math.max(3, region.height / 10)}px` }} />)}<span style={{ transform: `translate(${Math.max(2, -viewport.x / 10)}px, ${Math.max(2, -viewport.y / 10)}px)` }} /></div></div>
       </div>
 
       {activities.length > 0 && <div className="activity-stack">{activities.slice(0, 3).map((activity) => (

@@ -25,6 +25,17 @@ export type CanvasElement = {
   createdAt: number
 }
 
+export type CanvasRegion = {
+  id: string
+  keyword: string
+  x: number
+  y: number
+  width: number
+  height: number
+  createdAt: number
+  expiresAt: number
+}
+
 export type KeywordGroup = {
   keyword: string
   elementIds: string[]

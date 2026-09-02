@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { toPng } from 'html-to-image'
-import type { AgentActivity, AgentReaction, CanvasElement, DeleteApprovalDecision, DeleteApprovalItem, KeywordGroup } from './types'
+import type { AgentActivity, AgentReaction, CanvasElement, CanvasRegion, DeleteApprovalDecision, DeleteApprovalItem, KeywordGroup } from './types'
 import { createElement, KEYWORD_TTL_MS } from './data'
 
 const TRANSPARENT_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
-const WEB_APP_CONTEXT_DESCRIPTION = 'This is a shared canvas where you collaborate with a human in real time and build shared understanding. Human selections become temporary keywords such as “open-thread.” Treat ordinary or misspelled speech-transcription phrases as possible keyword references; resolve them with canvas_resolve_reference, then repeat the exact canonical keyword in your response. Discuss the resolved work directly as a collaborator, not a webpage narrator, and prefer canvas tools over generic browser control.'
+const WEB_APP_CONTEXT_DESCRIPTION = 'This is a shared canvas where you collaborate with a human in real time and build shared understanding. Human selections of elements or empty spatial regions become temporary keywords such as “open-thread.” Treat ordinary or misspelled speech-transcription phrases as possible keyword references; resolve them with canvas_resolve_reference, then repeat the exact canonical keyword in your response. Discuss the resolved work directly as a collaborator, not a webpage narrator, and prefer canvas tools over generic browser control.'
 const CANVAS_AGENT_GUIDE = {
   name: 'Collaborative canvas interaction guide',
   version: '1.0',
@@ -13,15 +13,16 @@ const CANVAS_AGENT_GUIDE = {
     'Treat short names and ordinary spoken phrases as possible live canvas selection keywords. For example, Open Thread may refer to the keyword open-thread.',
     'Expect speech-transcription errors. Resolve plausible misspellings, then always use the exact canonical keyword returned by canvas_resolve_reference when referring back to the selection.',
     'When the user refers to something on this canvas, call canvas_resolve_reference before inspecting the DOM, taking a browser screenshot, clicking, or using generic browser control.',
-    'Use the exact element IDs returned by canvas_resolve_reference for later reads, screenshots, comments, updates, and deletion.',
+    'Use the exact element or region IDs returned by canvas_resolve_reference for later structured reads. Canvas regions expose world-space position, size, bounds, and center.',
     'Use canvas_capture_selection when visual appearance matters. Use structured element data when the user only needs names, text, comments, or status.',
     'Before every action that creates, updates, deletes, comments on, or otherwise changes canvas work, call canvas_communicate with state working to tell the human what you are about to do. Perform the action only after that notification is visible, then update the same activity with the result.',
     'Selection keywords expire three minutes after creation. Resolve them promptly and do not ask the user to explain that a phrase is a keyword.',
     'Prefer the canvas WebMCP tools for canvas work. Use generic browser control only when no registered canvas tool can complete the requested action.',
   ],
   vocabulary: {
-    selectionKeyword: 'A temporary spoken reference that maps one phrase to one or more exact canvas elements.',
+    selectionKeyword: 'A temporary spoken reference that maps one phrase to exact canvas elements or one empty spatial region.',
     frame: 'A standardized canvas element: Markdown document, PDF, CSV, website, note, or image.',
+    canvasRegion: 'A human-marked empty point or rectangle in canvas world coordinates. It has x, y, width, height, bounds, and center but no file content.',
   },
 }
 
@@ -104,6 +105,27 @@ const readElement = (element: CanvasElement) => ({
   })),
 })
 
+const summarizeRegion = (region: CanvasRegion) => ({
+  id: region.id,
+  type: 'canvas_region',
+  keyword: region.keyword,
+  kind: region.width === 0 && region.height === 0 ? 'point' : 'area',
+  position: { x: region.x, y: region.y },
+  size: { width: region.width, height: region.height },
+  bounds: {
+    left: region.x,
+    top: region.y,
+    right: region.x + region.width,
+    bottom: region.y + region.height,
+  },
+  center: {
+    x: region.x + region.width / 2,
+    y: region.y + region.height / 2,
+  },
+  coordinateSpace: 'canvas_world_units',
+  expiresAt: region.expiresAt,
+})
+
 async function captureCanvasElements(elements: CanvasElement[], requestedPixelRatio: number) {
   const padding = 32
   const labelSpace = 26
@@ -163,6 +185,7 @@ async function captureCanvasElements(elements: CanvasElement[], requestedPixelRa
 type API = {
   getElements: () => CanvasElement[]
   getKeywords: () => KeywordGroup[]
+  getRegions: () => CanvasRegion[]
   getActiveElement: () => CanvasElement | undefined
   setElements: React.Dispatch<React.SetStateAction<CanvasElement[]>>
   setKeywords: React.Dispatch<React.SetStateAction<KeywordGroup[]>>
@@ -180,6 +203,7 @@ export function useWebMCP(api: API, activeElement?: CanvasElement) {
   const activeElementId = activeElement?.id
   const activeElementType = activeElement?.type
   const isActiveKeyword = (group: KeywordGroup, now = Date.now()) => (group.expiresAt || group.createdAt + KEYWORD_TTL_MS) > now
+  const isActiveRegion = (region: CanvasRegion, now = Date.now()) => region.expiresAt > now
 
   useEffect(() => {
     apiRef.current = api
@@ -205,7 +229,7 @@ export function useWebMCP(api: API, activeElement?: CanvasElement) {
     })
     register({
       name: 'canvas_resolve_reference', title: 'Resolve any canvas reference',
-      description: 'USE FIRST whenever the user names or asks about something while this canvas is open, even if it sounds like ordinary language or contains speech-transcription errors. This read-only tool resolves exact and plausibly misspelled selection keywords to canvas items. Use its keyword exactly when replying. Then call the returned detailsTool for complete contents. Prefer this over DOM inspection or generic browser control.',
+      description: 'USE FIRST whenever the user names or asks about something while this canvas is open, even if it sounds like ordinary language or contains speech-transcription errors. This read-only tool resolves exact and plausibly misspelled selection keywords to canvas elements or empty spatial regions. Use its keyword exactly when replying. Then call the returned detailsTool for complete content or geometry. Prefer this over DOM inspection or generic browser control.',
       inputSchema: {
         type: 'object', properties: {
           reference: { type: 'string', description: 'The phrase the user said, a suspected keyword, or the full utterance containing it.' },
@@ -214,16 +238,32 @@ export function useWebMCP(api: API, activeElement?: CanvasElement) {
       annotations: { readOnlyHint: true },
       execute: async (input) => {
         const reference = String(input.reference || '')
-        const activeGroups = apiRef.current.getKeywords().filter((group) => isActiveKeyword(group)).sort((a, b) => b.keyword.length - a.keyword.length)
-        const exactKeywordGroup = activeGroups.find((group) => referenceContains(reference, group.keyword))
-        const keywordGroup = exactKeywordGroup || activeGroups.find((group) => referenceFuzzyMatches(reference, group.keyword))
-        if (keywordGroup) {
+        const activeReferences = [
+          ...apiRef.current.getKeywords().filter((group) => isActiveKeyword(group)).map((value) => ({ kind: 'elements' as const, keyword: value.keyword, value })),
+          ...apiRef.current.getRegions().filter((region) => isActiveRegion(region)).map((value) => ({ kind: 'region' as const, keyword: value.keyword, value })),
+        ].sort((a, b) => b.keyword.length - a.keyword.length)
+        const exactReference = activeReferences.find((item) => referenceContains(reference, item.keyword))
+        const matchedReference = exactReference || activeReferences.find((item) => referenceFuzzyMatches(reference, item.keyword))
+        if (matchedReference?.kind === 'region') {
+          const region = summarizeRegion(matchedReference.value)
+          return {
+            found: true,
+            keyword: matchedReference.keyword,
+            matchedBy: exactReference ? 'exact_or_normalized' : 'fuzzy_transcription',
+            referenceType: 'canvas_region',
+            region,
+            detailsTool: { name: 'canvas_read_regions', input: { regionIds: [region.id] } },
+          }
+        }
+        if (matchedReference?.kind === 'elements') {
+          const keywordGroup = matchedReference.value
           const items = apiRef.current.getElements().filter((element) => keywordGroup.elementIds.includes(element.id)).map(summarizeElement)
           apiRef.current.showAgentReaction(items.map((item) => item.id), 'looking')
           return {
             found: true,
             keyword: keywordGroup.keyword,
-            matchedBy: exactKeywordGroup ? 'exact_or_normalized' : 'fuzzy_transcription',
+            matchedBy: exactReference ? 'exact_or_normalized' : 'fuzzy_transcription',
+            referenceType: 'canvas_elements',
             items,
             detailsTool: { name: 'canvas_read_elements', input: { elementIds: items.map((item) => item.id) } },
             ...(items.some((item) => item.type === 'image') ? { visualTool: { name: 'canvas_capture_selection', input: { elementIds: items.filter((item) => item.type === 'image').map((item) => item.id) } } } : {}),
@@ -242,7 +282,7 @@ export function useWebMCP(api: API, activeElement?: CanvasElement) {
         }
         return {
           found: false, reference,
-          activeKeywords: activeGroups.map((group) => group.keyword),
+          activeKeywords: activeReferences.map((item) => item.keyword),
           elementNames: apiRef.current.getElements().map((element) => element.name),
           nextStep: 'If the reference is visual rather than named, use canvas_get_context or canvas_capture_selection instead of generic browser control.',
         }
@@ -250,12 +290,16 @@ export function useWebMCP(api: API, activeElement?: CanvasElement) {
     })
     register({
       name: 'canvas_get_context', title: 'Read canvas',
-      description: 'Get a compact overview of the canvas, including standardized element types and unresolved-comment status. Use canvas_read_elements for complete content and comments. Prefer this over DOM inspection or generic browser control.',
+      description: 'Get a compact overview of the canvas, including standardized elements, unresolved-comment status, and active empty-space regions with world-space geometry. Use canvas_read_elements or canvas_read_regions for complete details. Prefer this over DOM inspection or generic browser control.',
       inputSchema: { type: 'object', properties: {} }, annotations: { readOnlyHint: true },
       execute: async () => ({
         guide: CANVAS_AGENT_GUIDE,
         items: apiRef.current.getElements().map(summarizeElement),
-        activeKeywords: apiRef.current.getKeywords().filter((group) => isActiveKeyword(group) && !group.consumedAt).map((group) => ({ keyword: group.keyword, itemCount: group.elementIds.length })),
+        regions: apiRef.current.getRegions().filter((region) => isActiveRegion(region)).map(summarizeRegion),
+        activeKeywords: [
+          ...apiRef.current.getKeywords().filter((group) => isActiveKeyword(group) && !group.consumedAt).map((group) => ({ keyword: group.keyword, referenceType: 'canvas_elements', itemCount: group.elementIds.length })),
+          ...apiRef.current.getRegions().filter((region) => isActiveRegion(region)).map((region) => ({ keyword: region.keyword, referenceType: 'canvas_region', regionId: region.id })),
+        ],
       }),
     })
     register({
@@ -275,17 +319,39 @@ export function useWebMCP(api: API, activeElement?: CanvasElement) {
       },
     })
     register({
+      name: 'canvas_read_regions', title: 'Read canvas region geometry',
+      description: 'Read exact position and size properties for human-marked empty canvas points or rectangles. Coordinates use the stable canvas world coordinate space and are unaffected by the current pan or zoom.',
+      inputSchema: {
+        type: 'object', properties: {
+          regionIds: { type: 'array', items: { type: 'string' }, description: 'Exact region IDs returned by canvas_resolve_reference.' },
+        }, required: ['regionIds'],
+      },
+      annotations: { readOnlyHint: true },
+      execute: async (input) => {
+        const regionIds = Array.isArray(input.regionIds) ? input.regionIds.map(String) : []
+        const regions = apiRef.current.getRegions().filter((region) => regionIds.includes(region.id) && isActiveRegion(region)).map(summarizeRegion)
+        return { regions, missingRegionIds: regionIds.filter((id) => !regions.some((region) => region.id === id)) }
+      },
+    })
+    register({
       name: 'canvas_list_keywords', title: 'List selection keywords',
-      description: 'List recent human-created selection keywords in newest-first order. These keywords may appear in speech as normal words with spaces or different capitalization. Prefer canvas_resolve_reference when interpreting what the user said.',
+      description: 'List recent human-created element-selection and spatial-region keywords in newest-first order. These keywords may appear in speech as normal words with spaces or different capitalization. Prefer canvas_resolve_reference when interpreting what the user said.',
       inputSchema: { type: 'object', properties: { includeConsumed: { type: 'boolean', description: 'Include keywords already used by an agent.' } } }, annotations: { readOnlyHint: true },
       execute: async (input) => ({
-        keywords: apiRef.current.getKeywords()
+        keywords: [
+          ...apiRef.current.getKeywords()
           .filter((group) => isActiveKeyword(group) && (input.includeConsumed || !group.consumedAt))
-          .sort((a, b) => b.createdAt - a.createdAt)
           .map((group) => {
             const items = apiRef.current.getElements().filter((element) => group.elementIds.includes(element.id))
-            return { keyword: group.keyword, itemCount: items.length, types: [...new Set(items.map((item) => item.type))] }
+            return { keyword: group.keyword, referenceType: 'canvas_elements', itemCount: items.length, types: [...new Set(items.map((item) => item.type))], createdAt: group.createdAt }
           }),
+          ...apiRef.current.getRegions().filter((region) => isActiveRegion(region)).map((region) => ({
+            keyword: region.keyword,
+            referenceType: 'canvas_region',
+            region: summarizeRegion(region),
+            createdAt: region.createdAt,
+          })),
+        ].sort((a, b) => b.createdAt - a.createdAt),
       }),
     })
     register({
