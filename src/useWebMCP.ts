@@ -4,7 +4,7 @@ import type { AgentActivity, AgentReaction, CanvasElement, CanvasRegion, DeleteA
 import { createElement, KEYWORD_TTL_MS } from './data'
 
 const TRANSPARENT_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
-const WEB_APP_CONTEXT_DESCRIPTION = 'This is a shared canvas where you collaborate with a human in real time and build shared understanding. Human selections of elements or empty spatial regions become temporary keywords such as “open-thread.” Treat ordinary or misspelled speech-transcription phrases as possible keyword references; resolve them with canvas_resolve_reference, then repeat the exact canonical keyword in your response. Discuss the resolved work directly as a collaborator, not a webpage narrator, and prefer canvas tools over generic browser control.'
+const WEB_APP_CONTEXT_DESCRIPTION = 'This is a shared canvas where you collaborate with a human in real time and build shared understanding. Human selections of elements or dragged empty spatial regions become temporary keywords such as “open-thread.” Treat ordinary or misspelled speech-transcription phrases as possible keyword references; resolve them with canvas_resolve_reference, then repeat the exact canonical keyword in your response. Discuss the resolved work directly as a collaborator, not a webpage narrator, and prefer canvas tools over generic browser control.'
 const CANVAS_AGENT_GUIDE = {
   name: 'Collaborative canvas interaction guide',
   version: '1.0',
@@ -20,9 +20,9 @@ const CANVAS_AGENT_GUIDE = {
     'Prefer the canvas WebMCP tools for canvas work. Use generic browser control only when no registered canvas tool can complete the requested action.',
   ],
   vocabulary: {
-    selectionKeyword: 'A temporary spoken reference that maps one phrase to exact canvas elements or one empty spatial region.',
+    selectionKeyword: 'A temporary spoken reference that maps one phrase to exact canvas elements or one dragged empty spatial region.',
     frame: 'A standardized canvas element: Markdown document, PDF, CSV, website, note, or image.',
-    canvasRegion: 'A human-marked empty point or rectangle in canvas world coordinates. It has x, y, width, height, bounds, and center but no file content.',
+    canvasRegion: 'A human-marked empty rectangle in canvas world coordinates. It has x, y, width, height, bounds, and center but no file content.',
   },
 }
 
@@ -109,7 +109,7 @@ const summarizeRegion = (region: CanvasRegion) => ({
   id: region.id,
   type: 'canvas_region',
   keyword: region.keyword,
-  kind: region.width === 0 && region.height === 0 ? 'point' : 'area',
+  kind: 'area',
   position: { x: region.x, y: region.y },
   size: { width: region.width, height: region.height },
   bounds: {
@@ -320,7 +320,7 @@ export function useWebMCP(api: API, activeElement?: CanvasElement) {
     })
     register({
       name: 'canvas_read_regions', title: 'Read canvas region geometry',
-      description: 'Read exact position and size properties for human-marked empty canvas points or rectangles. Coordinates use the stable canvas world coordinate space and are unaffected by the current pan or zoom.',
+      description: 'Read exact position and size properties for human-marked empty canvas rectangles. Coordinates use the stable canvas world coordinate space and are unaffected by the current pan or zoom.',
       inputSchema: {
         type: 'object', properties: {
           regionIds: { type: 'array', items: { type: 'string' }, description: 'Exact region IDs returned by canvas_resolve_reference.' },

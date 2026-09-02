@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   FileSpreadsheet, FileText, Globe2, Hand, Layers3,
   Maximize2, MousePointer2, Plus,
-  Sparkles, StickyNote, Tags, Upload, X, ZoomIn, ZoomOut,
+  Sparkles, StickyNote, Tags, Trash2, Upload, X, ZoomIn, ZoomOut,
 } from 'lucide-react'
 import CanvasElementView from './CanvasElementView'
 import CommentsPanel from './CommentsPanel'
@@ -17,6 +17,7 @@ import type { AgentActivity, AgentReaction, CanvasElement, CanvasRegion, DeleteA
 const MIN_AGENT_REACTION_DURATION_MS = 3000
 
 type SelectionRect = { left: number; top: number; width: number; height: number }
+type SelectionPreview = { elementIds: string[]; regionId: string | null }
 type DeleteApprovalRequest = { id: string; items: DeleteApprovalItem[] }
 type PendingDeleteApproval = DeleteApprovalRequest & {
   resolve: (decision: DeleteApprovalDecision) => void
@@ -55,7 +56,7 @@ export default function CanvasApp() {
   const [deleteApprovalRequest, setDeleteApprovalRequest] = useState<DeleteApprovalRequest | null>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
-  const previewSelectionRef = useRef<string[] | null>(null)
+  const previewSelectionRef = useRef<SelectionPreview | null>(null)
   const reactionTimersRef = useRef<Map<string, number>>(new Map())
   const pendingDeleteApprovalRef = useRef<PendingDeleteApproval | null>(null)
 
@@ -142,6 +143,14 @@ export default function CanvasApp() {
     setKeywordNow(createdAt)
   }, [keywords, regions, viewport])
 
+  const deleteRegion = useCallback((id: string) => {
+    setRegions((items) => items.filter((item) => item.id !== id))
+    setSelectedRegionId((current) => current === id ? null : current)
+    if (previewSelectionRef.current?.regionId === id) {
+      previewSelectionRef.current = { ...previewSelectionRef.current, regionId: null }
+    }
+  }, [])
+
   const expandElement = useCallback((id: string) => {
     selectIds([id])
     setExpandedElementId(id)
@@ -158,7 +167,12 @@ export default function CanvasApp() {
     setExpandedElementId((current) => current && deletedIds.has(current) ? null : current)
     setCommentElementId((current) => current && deletedIds.has(current) ? null : current)
     setAgentReactions((current) => Object.fromEntries(Object.entries(current).filter(([id]) => !deletedIds.has(id))))
-    previewSelectionRef.current = previewSelectionRef.current?.filter((id) => !deletedIds.has(id)) || null
+    if (previewSelectionRef.current) {
+      previewSelectionRef.current = {
+        ...previewSelectionRef.current,
+        elementIds: previewSelectionRef.current.elementIds.filter((id) => !deletedIds.has(id)),
+      }
+    }
     deletedIds.forEach((id) => {
       const timer = reactionTimersRef.current.get(id)
       if (timer) window.clearTimeout(timer)
@@ -307,13 +321,23 @@ export default function CanvasApp() {
   }, [selectionMenuOpen])
 
   const previewSelection = (ids: string[]) => {
-    if (!previewSelectionRef.current) previewSelectionRef.current = selectedIds
+    if (!previewSelectionRef.current) previewSelectionRef.current = { elementIds: selectedIds, regionId: selectedRegionId }
+    setSelectedRegionId(null)
     setSelectedIds(ids)
+  }
+
+  const previewRegion = (id: string) => {
+    if (!previewSelectionRef.current) previewSelectionRef.current = { elementIds: selectedIds, regionId: selectedRegionId }
+    setSelectedIds([])
+    setSelectedRegionId(id)
   }
 
   const restoreSelectionPreview = () => {
     const previous = previewSelectionRef.current
-    if (previous) setSelectedIds(previous)
+    if (previous) {
+      setSelectedIds(previous.elementIds)
+      setSelectedRegionId(previous.regionId)
+    }
     previewSelectionRef.current = null
   }
 
@@ -436,7 +460,8 @@ export default function CanvasApp() {
     }
     const up = () => {
       if (currentIds.length) selectIds(currentIds)
-      else if (!retainedIds.length) createRegion(moved ? finalRect : { left: start.x, top: start.y, width: 0, height: 0 })
+      else if (moved && !retainedIds.length) createRegion(finalRect)
+      else selectIds(retainedIds)
       setSelectionRect(null)
       window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up)
     }
@@ -483,13 +508,23 @@ export default function CanvasApp() {
           ))}
           {activeRegions.map((region) => (
             <div
-              className={`canvas-region ${region.width === 0 && region.height === 0 ? 'point' : ''} ${selectedRegionId === region.id ? 'selected' : ''}`}
+              className={`canvas-region ${selectedRegionId === region.id ? 'selected' : ''}`}
               data-region-id={region.id}
               key={region.id}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={() => selectRegion(region.id)}
               style={{ transform: `translate(${region.x}px, ${region.y}px)`, width: `${region.width}px`, height: `${region.height}px` }}
             >
-              <button onPointerDown={(event) => event.stopPropagation()} onClick={() => selectRegion(region.id)} title="Select this canvas region">
+              <button className="region-keyword" onClick={(event) => { event.stopPropagation(); selectRegion(region.id) }} title="Select this canvas region">
                 {region.keyword}
+              </button>
+              <button
+                className="region-delete"
+                aria-label={`Delete region ${region.keyword}`}
+                title="Delete region"
+                onClick={(event) => { event.stopPropagation(); deleteRegion(region.id) }}
+              >
+                <Trash2 size={24} strokeWidth={1.8} />
               </button>
             </div>
           ))}
@@ -529,6 +564,7 @@ export default function CanvasApp() {
                 <button
                   className={region.id === selectedRegionId ? 'current' : ''}
                   key={region.id}
+                  onMouseEnter={() => previewRegion(region.id)}
                   onClick={() => commitRegion(region)}
                   title={`Show ${region.width || 0} × ${region.height || 0} canvas region`}
                 >

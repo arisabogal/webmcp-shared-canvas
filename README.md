@@ -2,7 +2,7 @@
 
 An infinite collaborative workspace where a human and an external AI agent build shared context through WebMCP.
 
-Instead of describing a file by location or passing screenshots through chat, a human can select canvas items or mark an empty point or rectangular region and immediately receive a short, temporary keyword such as `open-thread`. The agent resolves that spoken reference to stable element or region IDs, reads only the necessary content or geometry, communicates its intent on the canvas, and performs structured actions through the page's WebMCP tools.
+Instead of describing a file by location or passing screenshots through chat, a human can select canvas items or drag across an empty region and immediately receive a short, temporary keyword such as `open-thread`. The agent resolves that spoken reference to stable element or region IDs, reads only the necessary content or geometry, communicates its intent on the canvas, and performs structured actions through the page's WebMCP tools.
 
 > Built for the [OpenAI WebMCP Challenge](https://webmcp.devpost.com/) during the August 25–September 3, 2026 submission period.
 
@@ -27,7 +27,7 @@ This makes spatial context addressable without forcing the human to interrupt di
 
 - Arrange Markdown documents, PDFs, CSV files, websites, notes, and images on an infinite canvas.
 - Select one item or marquee-select several items and refer to the group using a temporary spoken keyword.
-- Click empty canvas space to mark a point, or drag across an empty area to mark a rectangular region; the agent can read its world-space position, size, bounds, and center through the assigned keyword.
+- Drag across an empty area to mark a rectangular region; the agent can read its world-space position, size, bounds, and center through the assigned keyword. Clicking empty space only clears the current selection, while hovering a region reveals its delete control.
 - Reuse the same keyword for the same selection while it remains active; selecting it again resets its three-minute lifetime.
 - Resolve capitalization differences and plausible speech-transcription errors while always returning the canonical keyword.
 - Read structured content and unresolved-comment counts without scraping the rendered interface.
