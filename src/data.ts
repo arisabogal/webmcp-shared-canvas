@@ -3,7 +3,7 @@ import type { CanvasElement, KeywordGroup } from './types'
 const now = Date.now()
 
 export const KEYWORD_TTL_MS = 3 * 60 * 1000
-export const WEBMCP_SPEC_URL = 'https://developer.chrome.com/docs/ai/webmcp'
+export const OPENAI_WEBMCP_SHOWCASE_URL = 'https://developers.openai.com/showcase?view=webmcp-apps'
 
 export const initialElements: CanvasElement[] = [
   {
@@ -23,8 +23,8 @@ export const initialElements: CanvasElement[] = [
     createdBy: 'human', createdAt: now - 82_000_000,
   },
   {
-    id: 'webmcp-spec', type: 'website', name: 'WebMCP specification', x: 1060, y: 130, width: 390, height: 300,
-    src: WEBMCP_SPEC_URL, content: 'developer.chrome.com/docs/ai/webmcp',
+    id: 'webmcp-spec', type: 'website', name: 'OpenAI WebMCP apps showcase', x: 1060, y: 130, width: 390, height: 300,
+    src: OPENAI_WEBMCP_SHOWCASE_URL, content: 'developers.openai.com/showcase?view=webmcp-apps',
     comments: [], createdBy: 'human', createdAt: now - 64_000_000,
   },
   {
