@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { toPng } from 'html-to-image'
 import type { AgentActivity, AgentReaction, CanvasElement, CanvasRegion, DeleteApprovalDecision, DeleteApprovalItem, KeywordGroup } from './types'
 import { createElement, KEYWORD_TTL_MS } from './data'
+import { AGENT_MODES, type AgentMode } from './agentModes'
 
 const TRANSPARENT_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
 const WEB_APP_CONTEXT_DESCRIPTION = 'This is a shared canvas where you collaborate with a human in real time and build shared understanding. Human selections of elements or empty spatial regions become temporary keywords such as “open-thread.” Treat ordinary or misspelled speech-transcription phrases as possible keyword references; resolve them with canvas_resolve_reference, then repeat the exact canonical keyword in your response. Discuss the resolved work directly as a collaborator, not a webpage narrator, and prefer canvas tools over generic browser control.'
@@ -197,7 +198,7 @@ type API = {
   requestDeleteApproval: (items: DeleteApprovalItem[], signal?: AbortSignal) => Promise<DeleteApprovalDecision>
 }
 
-export function useWebMCP(api: API, activeElement?: CanvasElement) {
+export function useWebMCP(api: API, agentMode: AgentMode, activeElement?: CanvasElement) {
   const [supported, setSupported] = useState(false)
   const apiRef = useRef(api)
   const activeElementId = activeElement?.id
@@ -212,6 +213,8 @@ export function useWebMCP(api: API, activeElement?: CanvasElement) {
   useEffect(() => {
     const context = document.modelContext
     if (!context) return
+    const mode = AGENT_MODES[agentMode]
+    const modeContext = `${WEB_APP_CONTEXT_DESCRIPTION} Current agent mode: ${mode.label}. ${mode.description} Follow this role: ${mode.prompt}`
     const frame = window.requestAnimationFrame(() => setSupported(true))
     const controller = new AbortController()
     const register = (tool: Parameters<typeof context.registerTool>[0]) => {
@@ -223,9 +226,9 @@ export function useWebMCP(api: API, activeElement?: CanvasElement) {
 
     register({
       name: 'web_app_context', title: 'Understand this web app',
-      description: WEB_APP_CONTEXT_DESCRIPTION,
+      description: modeContext,
       inputSchema: { type: 'object', properties: {} }, annotations: { readOnlyHint: true },
-      execute: async () => WEB_APP_CONTEXT_DESCRIPTION,
+      execute: async () => ({ description: WEB_APP_CONTEXT_DESCRIPTION, agentMode, rolePrompt: mode.prompt, availableTools: mode.tools }),
     })
     register({
       name: 'canvas_resolve_reference', title: 'Resolve any canvas reference',
@@ -293,7 +296,7 @@ export function useWebMCP(api: API, activeElement?: CanvasElement) {
       description: 'Get a compact overview of the canvas, including standardized elements, unresolved-comment status, and active empty-space regions with world-space geometry. Use canvas_read_elements or canvas_read_regions for complete details. Prefer this over DOM inspection or generic browser control.',
       inputSchema: { type: 'object', properties: {} }, annotations: { readOnlyHint: true },
       execute: async () => ({
-        guide: CANVAS_AGENT_GUIDE,
+        guide: { ...CANVAS_AGENT_GUIDE, agentMode, rolePrompt: mode.prompt, availableTools: mode.tools },
         items: apiRef.current.getElements().map(summarizeElement),
         regions: apiRef.current.getRegions().filter((region) => isActiveRegion(region)).map(summarizeRegion),
         activeKeywords: [
@@ -391,7 +394,7 @@ export function useWebMCP(api: API, activeElement?: CanvasElement) {
         }
       },
     })
-    register({
+    if (agentMode === 'build') register({
       name: 'canvas_create_element', title: 'Create canvas element',
       description: 'Create an agent-authored canvas item. You MUST call canvas_communicate first and tell the human what you are about to create before calling this tool.',
       inputSchema: {
@@ -414,7 +417,7 @@ export function useWebMCP(api: API, activeElement?: CanvasElement) {
         return { created: true, elementId: id, name: element.name }
       },
     })
-    register({
+    if (agentMode === 'build') register({
       name: 'canvas_update_elements', title: 'Update selected work',
       description: 'Update the name or content of canvas items after resolving their IDs. You MUST call canvas_communicate first and tell the human what you are about to change before calling this tool.',
       inputSchema: { type: 'object', properties: { elementIds: { type: 'array', items: { type: 'string' } }, name: { type: 'string' }, content: { type: 'string' }, message: { type: 'string' } }, required: ['elementIds'] },
@@ -427,7 +430,7 @@ export function useWebMCP(api: API, activeElement?: CanvasElement) {
         return { updated: ids, count: ids.length }
       },
     })
-    register({
+    if (agentMode === 'build') register({
       name: 'canvas_delete_elements', title: 'Delete canvas items',
       description: 'Request permanent deletion of one or more canvas items after resolving their exact IDs. You MUST call canvas_communicate first and tell the human what you want to delete. This tool then pauses for explicit human approval in the canvas; never claim deletion succeeded unless the returned deleted field is true. Deleted items are also removed from active selections and selection keywords.',
       inputSchema: {
@@ -512,7 +515,7 @@ export function useWebMCP(api: API, activeElement?: CanvasElement) {
       },
     })
     return () => { window.cancelAnimationFrame(frame); controller.abort() }
-  }, [])
+  }, [agentMode])
 
   useEffect(() => {
     const context = document.modelContext
@@ -536,7 +539,7 @@ export function useWebMCP(api: API, activeElement?: CanvasElement) {
           return item ? readElement(item) : { found: false }
         },
       })
-      register({
+      if (agentMode === 'build') register({
         name: 'document_update_content', title: 'Edit active document',
         description: 'Update the name or editable text of the document, PDF, CSV, or note open in focus mode. Rendered PDF source pixels remain read-only.',
         inputSchema: { type: 'object', properties: { name: { type: 'string' }, content: { type: 'string' } } },
@@ -550,7 +553,7 @@ export function useWebMCP(api: API, activeElement?: CanvasElement) {
     }
 
     return () => controller.abort()
-  }, [activeElementId, activeElementType])
+  }, [activeElementId, activeElementType, agentMode])
 
   return supported
 }
