@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  FileSpreadsheet, FileText, Globe2, Hand, Layers3,
+  Check, Copy, FileSpreadsheet, FileText, Globe2, Hand, Layers3,
   Maximize2, MousePointer2, Plus,
   Sparkles, StickyNote, Tags, Upload, X, ZoomIn, ZoomOut,
 } from 'lucide-react'
@@ -12,6 +12,7 @@ import DeleteApprovalDialog from './DeleteApprovalDialog'
 import FocusMode from './FocusMode'
 import { createElement, initialElements, KEYWORD_TTL_MS, makeKeyword } from '@/data'
 import { useWebMCP } from '@/useWebMCP'
+import { AGENT_MODES, type AgentMode } from '@/agentModes'
 import type { AgentActivity, AgentReaction, CanvasElement, CanvasRegion, DeleteApprovalDecision, DeleteApprovalItem, ElementType, KeywordGroup, Viewport } from '@/types'
 
 const MIN_AGENT_REACTION_DURATION_MS = 3000
@@ -42,6 +43,9 @@ export default function CanvasApp() {
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null)
   const [viewport, setViewport] = useState<Viewport>({ x: 60, y: 34, scale: 0.82 })
   const [tool, setTool] = useState<'select' | 'hand'>('select')
+  const [agentMode, setAgentMode] = useState<AgentMode>('review')
+  const [agentPromptOpen, setAgentPromptOpen] = useState(false)
+  const [promptCopied, setPromptCopied] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [linkOpen, setLinkOpen] = useState(false)
   const [selectionMenuOpen, setSelectionMenuOpen] = useState(false)
@@ -258,12 +262,18 @@ export default function CanvasApp() {
     getRegions: () => regions,
     getActiveElement: () => elements.find((element) => element.id === expandedElementId),
     setElements, setKeywords, setSelectedIds: selectIds, setActivities, focusElement, showAgentReaction, deleteElements, requestDeleteApproval,
-  }, expandedElement)
+  }, agentMode, expandedElement)
   const agentIsActive = webMcpSupported && (
     activities.some((activity) => activity.state === 'working')
     || elements.some((element) => element.status === 'working')
     || Object.keys(agentReactions).length > 0
   )
+
+  const copyAgentPrompt = useCallback(async () => {
+    await navigator.clipboard.writeText(AGENT_MODES[agentMode].prompt)
+    setPromptCopied(true)
+    window.setTimeout(() => setPromptCopied(false), 1600)
+  }, [agentMode])
 
   const latestKeyword = useMemo(() => {
     if (!selectedIds.length) return null
@@ -468,6 +478,38 @@ export default function CanvasApp() {
           </div>
         )}
         <div className="topbar-right">
+          <div className="agent-mode-control">
+            <span className="agent-mode-label">Agent mode</span>
+            <div className="agent-mode-toggle" role="group" aria-label="Agent mode">
+              {(Object.keys(AGENT_MODES) as AgentMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  className={agentMode === mode ? 'active' : ''}
+                  aria-pressed={agentMode === mode}
+                  onClick={() => { setAgentMode(mode); setPromptCopied(false) }}
+                >{AGENT_MODES[mode].label}</button>
+              ))}
+            </div>
+            <button
+              className={`agent-prompt-trigger ${agentPromptOpen ? 'active' : ''}`}
+              aria-expanded={agentPromptOpen}
+              onClick={() => setAgentPromptOpen((open) => !open)}
+            >Prompt</button>
+            {agentPromptOpen && (
+              <section className="agent-prompt-popover" aria-label={`${AGENT_MODES[agentMode].label} mode prompt`}>
+                <header>
+                  <div><small>{AGENT_MODES[agentMode].label} mode</small><strong>Agent role prompt</strong></div>
+                  <button aria-label="Close agent prompt" onClick={() => setAgentPromptOpen(false)}><X size={15} /></button>
+                </header>
+                <p>{AGENT_MODES[agentMode].description}</p>
+                <textarea readOnly value={AGENT_MODES[agentMode].prompt} aria-label="Agent role prompt text" />
+                <div className="agent-prompt-footer">
+                  <span>{AGENT_MODES[agentMode].tools.length} tools available</span>
+                  <button onClick={copyAgentPrompt}>{promptCopied ? <Check size={14} /> : <Copy size={14} />}{promptCopied ? 'Copied' : 'Copy prompt'}</button>
+                </div>
+              </section>
+            )}
+          </div>
           <div className={`webmcp-state ${webMcpSupported ? 'connected' : ''}`} title={webMcpSupported ? 'WebMCP tools registered' : 'WebMCP unavailable in this browser'}><span /> WebMCP</div>
           <div className="avatars"><span>AS</span>{agentIsActive && <span className="agent-avatar" role="status" aria-label="Agent active on canvas" title="Agent active on canvas"><Sparkles size={12} /></span>}<button aria-label="Invite collaborators"><Plus size={14} /></button></div>
         </div>
