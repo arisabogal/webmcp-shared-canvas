@@ -110,6 +110,41 @@ export default function CanvasApp() {
     })
   }, [])
 
+  const selectAgentTargets = useCallback((ids: string[]) => {
+    const normalizedIds = [...new Set(ids)]
+    if (!normalizedIds.length) return null
+    const selectedAt = Date.now()
+    const signature = selectionKey(normalizedIds)
+    const activeMatch = keywords.find((group) => group.expiresAt > selectedAt && selectionKey(group.elementIds) === signature)
+    const keyword = activeMatch?.keyword || makeKeyword([
+      ...keywords,
+      ...regions.map((region) => ({ keyword: region.keyword, elementIds: [], createdAt: region.createdAt, expiresAt: region.expiresAt })),
+    ])
+
+    setSelectedRegionId(null)
+    setSelectedIds(normalizedIds)
+    setKeywordNow(selectedAt)
+    setKeywords((groups) => {
+      const activeGroups = groups.filter((group) => group.expiresAt > selectedAt)
+      const currentMatch = activeGroups.find((group) => selectionKey(group.elementIds) === signature)
+      if (currentMatch) {
+        return activeGroups.map((group) => group.keyword === currentMatch.keyword ? {
+          ...group,
+          createdAt: selectedAt,
+          expiresAt: selectedAt + KEYWORD_TTL_MS,
+          consumedAt: undefined,
+        } : group)
+      }
+      return [...activeGroups, {
+        keyword,
+        elementIds: [...normalizedIds].sort(),
+        createdAt: selectedAt,
+        expiresAt: selectedAt + KEYWORD_TTL_MS,
+      }].slice(-40)
+    })
+    return activeMatch?.keyword || keyword
+  }, [keywords, regions])
+
   const selectRegion = useCallback((id: string) => {
     const selectedAt = Date.now()
     setKeywordNow(selectedAt)
@@ -271,8 +306,8 @@ export default function CanvasApp() {
     getKeywords: () => keywords,
     getRegions: () => regions,
     getActiveElement: () => elements.find((element) => element.id === expandedElementId),
-    setElements, setKeywords, setSelectedIds: selectIds, setActivities, focusElement, showAgentReaction, deleteElements, requestDeleteApproval,
-  }, expandedElement)
+    setElements, setKeywords, selectTargets: selectAgentTargets, setActivities, focusElement, showAgentReaction, deleteElements, requestDeleteApproval,
+  })
   const agentIsActive = webMcpSupported && (
     activities.some((activity) => activity.state === 'working')
     || elements.some((element) => element.status === 'working')

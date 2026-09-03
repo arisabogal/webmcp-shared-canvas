@@ -35,7 +35,7 @@ export const initialElements: CanvasElement[] = [
   },
   {
     id: 'tool-evaluation', type: 'csv', name: 'webmcp-tool-evaluation.csv', x: 1040, y: 500, width: 450, height: 300,
-    content: 'tool,purpose,status\nweb_app_context,Orient agent,Ready\ncanvas_resolve_reference,Match speech to selection,Ready\ncanvas_read_elements,Read item contents,Ready\ncanvas_capture_selection,Inspect pixels,Review\ncanvas_communicate,Show agent intent,Ready',
+    content: 'tool,purpose,status\ncanvas_list,Orient agent,Ready\ncanvas_resolve,Match speech to targets,Ready\ncanvas_read,Read content and geometry,Ready\ncanvas_capture,Inspect pixels,Ready\ncanvas_create,Create in a region,Ready\ncanvas_update,Edit content and comments,Ready\ncanvas_delete,Approval-gated deletion,Ready',
     comments: [{ id: 'tools-c1', author: 'You', body: 'Validate screenshot behavior for embedded websites.', createdAt: now - 3_600_000 }],
     createdBy: 'human', createdAt: now - 32_000_000,
   },

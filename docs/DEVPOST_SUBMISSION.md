@@ -18,15 +18,15 @@ Project feedback becomes fragmented when teams pass screenshots, links, files, a
 
 WebMCP Shared Canvas is an infinite project workspace for Markdown documents, PDFs, CSV files, websites, notes, and images. A human can select one or several items while speaking naturally. The canvas immediately creates a short-lived keyword for that selection, and the external agent can resolve the spoken phrase—even when speech transcription changes capitalization, spacing, or spelling—to stable canvas element IDs.
 
-The agent can then read the selected contents and comments, inspect a visual capture, communicate what it is about to do, and create, update, or comment on canvas work. Agent activity remains visible through non-blocking notifications and lightweight reactions attached to the affected elements.
+The agent can then read the selected contents, comments, and geometry, inspect a visual capture, and create, update, comment on, or delete canvas work. Every mutation includes an intent that appears before the change and evolves into its completion status. Agent activity remains visible through that continuous notification and lightweight reactions attached to affected elements.
 
 ### Why this is a strong fit for WebMCP
 
-The core problem is not automating a button click. It is giving a human and agent a reliable shared vocabulary for spatial, multi-file work. WebMCP lets the page expose selection meaning, stable identifiers, content types, comment state, and safe mutations directly. That semantic contract is more accurate and efficient than guessing from pixels or scraping the DOM.
+The core problem is not automating a button click. It is giving a human and agent a reliable shared vocabulary for spatial, multi-file work. WebMCP lets the page expose selection meaning, stable identifiers, content types, geometry, comment state, and safe mutations directly. That semantic contract is more accurate and efficient than guessing from pixels or scraping the DOM.
 
 ### Better user experience
 
-The human does not need to stop dictating to enumerate filenames, describe coordinates, or explain that a phrase refers to a website selection. Immediate keywords provide feedback in the same conversational moment. The agent resolves those references first, reads only what it needs, announces mutations before acting, and uses the exact canonical keyword in its response. Both collaborators can see the same work and understand what is changing.
+The human does not need to stop dictating to enumerate filenames, describe coordinates, or explain that a phrase refers to a website selection. Immediate keywords provide feedback in the same conversational moment. The agent resolves those references first, reads only what it needs, and supplies a visible intent with each mutation. The resulting work receives its own canonical reference, so both collaborators can continue using the same vocabulary.
 
 ### What was difficult before
 
@@ -34,7 +34,7 @@ Before this interaction model, teams had to move context between the canvas and 
 
 ### How WebMCP was implemented
 
-The Next.js client registers read and mutation tools through `document.modelContext.registerTool`. A three-minute selection registry maps generated keywords to stable element IDs. `canvas_resolve_reference` normalizes natural speech and performs conservative fuzzy matching for transcription errors. The response tells the agent which tool and IDs to use next. Separate tools expose compact context, full element contents, comment status, PNG capture, visible communication, comments, element creation, and updates. Tool registration follows the page lifecycle and contextual tools can respond to the currently focused media type.
+The Next.js client registers seven focused tools through `document.modelContext.registerTool`. A three-minute selection registry maps generated keywords to stable target IDs. `canvas_resolve` normalizes natural speech and performs conservative fuzzy matching for transcription errors. `canvas_read` handles both items and spatial regions through one target vocabulary, while `canvas_capture` provides pixels only when needed. Three mutation tools handle creation, updates, and approval-gated deletion; each renders its required intent before applying the change and returns a canonical reference when appropriate. Tool registration follows the page lifecycle through an abort signal.
 
 ## Suggested tags
 
@@ -50,7 +50,7 @@ The published video must be public on YouTube, include audio, show the working p
 | 0:20–0:45 | Marquee-select two different media items | Immediate spoken keyword and three-minute stable selection |
 | 0:45–1:10 | Ask about a slightly misspelled/spaced version of the keyword | Semantic resolution and canonical keyword recovery |
 | 1:10–1:35 | Read contents and unresolved comments | Structured WebMCP output instead of DOM scraping |
-| 1:35–2:05 | Request a comment or content update | Visible `canvas_communicate` notification before mutation |
+| 1:35–2:05 | Request a comment or content update | Required mutation intent appears before the change and becomes its completion status |
 | 2:05–2:25 | Ask for a visual capture or create a new item | Screenshot tool and visible agent reactions |
 | 2:25–2:45 | Show resulting shared state | What humans and agents can now do together |
 

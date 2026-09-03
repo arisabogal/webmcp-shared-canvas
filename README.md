@@ -17,9 +17,9 @@ WebMCP Shared Canvas gives the human and agent a common interaction model:
 1. The human selects related canvas items while speaking naturally.
 2. The canvas immediately assigns that selection a memorable keyword.
 3. The agent resolves the exact or transcription-imperfect phrase through WebMCP.
-4. The agent receives stable IDs, media types, content previews, and comment state.
-5. Before making a change, the agent posts a visible, non-blocking canvas notification.
-6. The agent reads, comments on, creates, or updates the selected work using structured tools.
+4. The agent receives stable IDs, media types, content previews, geometry, and comment state.
+5. Every mutation carries a required intent that appears before the change and evolves into its completion status.
+6. The agent reads, captures, creates, updates, or deletes the selected work using one consistent target vocabulary.
 
 This makes spatial context addressable without forcing the human to interrupt dictation, name every file, or explain how the website works.
 
@@ -37,21 +37,19 @@ This makes spatial context addressable without forcing the human to interrupt di
 
 ## WebMCP implementation
 
-The app registers tools directly with `document.modelContext.registerTool(...)`. Tool registration is scoped to the page lifecycle with an `AbortController`; contextual tools can change with the active canvas item.
+The app registers tools directly with `document.modelContext.registerTool(...)`. Tool registration is scoped to the page lifecycle with an `AbortController`, while `canvas_read` and `canvas_update` can target the item currently open in focus mode without registering duplicate contextual tools.
 
 | Tool | Purpose | Access |
 | --- | --- | --- |
-| `web_app_context` | Gives the agent the collaboration contract and terminology | Read only |
-| `canvas_resolve_reference` | Resolves exact or fuzzy spoken references to canonical keywords and element IDs | Read only |
-| `canvas_get_context` | Returns a compact overview of elements, types, comments, and active selections | Read only |
-| `canvas_read_elements` | Reads full content and comment details for exact element IDs | Read only |
-| `canvas_read_regions` | Reads position, size, bounds, and center for exact spatial region IDs | Read only |
-| `canvas_list_keywords` | Lists active selection keywords in recency order | Read only |
-| `canvas_capture_selection` | Produces a cropped PNG of selected canvas elements | Read only |
-| `canvas_communicate` | Posts visible agent intent, progress, results, or requests for attention | Mutating |
-| `canvas_create_element` | Creates a standardized canvas element | Mutating |
-| `canvas_update_elements` | Updates selected work by stable element ID | Mutating |
-| `canvas_add_comment` | Leaves a contextual comment on a canvas element | Mutating |
+| `canvas_list` | Returns a compact overview and active references when no target was named | Read only |
+| `canvas_resolve` | Resolves exact or fuzzy spoken references into canonical references and stable target IDs | Read only |
+| `canvas_read` | Reads content, comments, and world-space geometry for items or regions | Read only |
+| `canvas_capture` | Produces a cropped PNG when visual inspection matters | Read only |
+| `canvas_create` | Creates a standardized item, optionally inside a selected region | Mutating |
+| `canvas_update` | Updates content or comment state on resolved items | Mutating |
+| `canvas_delete` | Requests approval, then deletes resolved items | Mutating |
+
+Mutation tools require a short human-readable `intent`. The canvas renders that intent before applying the change and updates the same activity when the operation completes, so the agent does not need a separate coordination tool.
 
 The tool contract lives in [`src/useWebMCP.ts`](src/useWebMCP.ts). Canvas data types are defined in [`src/types.ts`](src/types.ts), and the WebMCP-focused demo dataset is in [`src/data.ts`](src/data.ts).
 
@@ -88,9 +86,9 @@ No environment variables, database, account, or external API key are required fo
 
 1. Open the app in ChatGPT's in-app browser or WebMCP-enabled Chrome.
 2. Drag a marquee around two canvas elements. A keyword appears immediately.
-3. Tell the agent: “Summarize **[keyword]** and tell me which items still have unresolved comments.” A transcription variation or spaced/capitalized version should also resolve.
+3. Tell the agent: “Summarize **[keyword]** and tell me which items still have unresolved comments.” A transcription variation or spaced/capitalized version should also resolve through `canvas_resolve`.
 4. Ask the agent to update or comment on the selection.
-5. Confirm that the agent first posts a visible canvas notification, then performs the requested action and reports the result with the canonical keyword.
+5. Confirm that the mutation intent appears before the action, evolves into a completion status, and returns a canonical reference for the result.
 6. Ask the agent to capture the selected frames when visual inspection matters.
 
 ## Project structure
