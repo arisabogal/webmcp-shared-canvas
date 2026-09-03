@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   FileSpreadsheet, FileText, Globe2, Hand, Layers3,
   Maximize2, MousePointer2, Plus,
-  Sparkles, StickyNote, Tags, Trash2, Upload, X, ZoomIn, ZoomOut,
+  Sparkles, StickyNote, Tags, Trash2, Upload, ZoomIn, ZoomOut,
 } from 'lucide-react'
 import CanvasElementView from './CanvasElementView'
 import CommentsPanel from './CommentsPanel'
@@ -15,6 +15,7 @@ import { useWebMCP } from '@/useWebMCP'
 import type { AgentActivity, AgentReaction, CanvasElement, CanvasRegion, DeleteApprovalDecision, DeleteApprovalItem, ElementType, KeywordGroup, Viewport } from '@/types'
 
 const MIN_AGENT_REACTION_DURATION_MS = 3000
+const AGENT_ACTIVITY_DURATION_MS = 5000
 
 type SelectionRect = { left: number; top: number; width: number; height: number }
 type SelectionPreview = { elementIds: string[]; regionId: string | null }
@@ -58,6 +59,7 @@ export default function CanvasApp() {
   const fileRef = useRef<HTMLInputElement>(null)
   const previewSelectionRef = useRef<SelectionPreview | null>(null)
   const reactionTimersRef = useRef<Map<string, number>>(new Map())
+  const activityTimersRef = useRef<Map<string, { timer: number; expiresAt: number }>>(new Map())
   const pendingDeleteApprovalRef = useRef<PendingDeleteApproval | null>(null)
 
   const showAgentReaction = useCallback((ids: string[], reaction: AgentReaction, duration = MIN_AGENT_REACTION_DURATION_MS) => {
@@ -83,6 +85,35 @@ export default function CanvasApp() {
   useEffect(() => () => {
     reactionTimersRef.current.forEach((timer) => window.clearTimeout(timer))
     reactionTimersRef.current.clear()
+  }, [])
+
+  useEffect(() => {
+    const activityIds = new Set(activities.map((activity) => activity.id))
+
+    activityTimersRef.current.forEach(({ timer }, id) => {
+      if (activityIds.has(id)) return
+      window.clearTimeout(timer)
+      activityTimersRef.current.delete(id)
+    })
+
+    activities.forEach((activity) => {
+      const expiresAt = activity.createdAt + AGENT_ACTIVITY_DURATION_MS
+      const existing = activityTimersRef.current.get(activity.id)
+      if (existing?.expiresAt === expiresAt) return
+      if (existing) window.clearTimeout(existing.timer)
+
+      const timer = window.setTimeout(() => {
+        setActivities((items) => items.filter((item) => item.id !== activity.id || item.createdAt !== activity.createdAt))
+        activityTimersRef.current.delete(activity.id)
+      }, Math.max(0, expiresAt - Date.now()))
+
+      activityTimersRef.current.set(activity.id, { timer, expiresAt })
+    })
+  }, [activities])
+
+  useEffect(() => () => {
+    activityTimersRef.current.forEach(({ timer }) => window.clearTimeout(timer))
+    activityTimersRef.current.clear()
   }, [])
 
   const selectIds = useCallback((ids: string[]) => {
@@ -647,11 +678,11 @@ export default function CanvasApp() {
       </div>
 
       {activities.length > 0 && <div className="activity-stack">{activities.slice(0, 3).map((activity) => (
-        <div className={`activity-note ${activity.state}`} key={activity.id}>
-          <button className="activity-main" onClick={() => activity.elementIds[0] && focusElement(activity.elementIds[0])}>
-            <span><Sparkles size={13} /></span><div><small>{activity.state === 'attention' ? 'Agent needs input' : 'Agent'}</small><p>{activity.message}</p></div>
+        <div className={`activity-note ${activity.state}`} key={`${activity.id}-${activity.createdAt}`} role="status">
+          <button className="activity-main" disabled={!activity.elementIds[0]} onClick={() => activity.elementIds[0] && focusElement(activity.elementIds[0])}>
+            <span aria-hidden="true"><Sparkles size={14} /></span>
+            <p>{activity.message}</p>
           </button>
-          <button className="activity-dismiss" aria-label="Dismiss notification" onClick={() => setActivities((items) => items.filter((item) => item.id !== activity.id))}><X size={12} /></button>
         </div>
       ))}</div>}
 
